@@ -1,9 +1,11 @@
 {
-  "name": "bug-triage-bot",
+  "name": "sl-qa",
   "version": "1.0.0",
-  "description": "Zero-AI QA runner: reads test cases from a Google Sheet, runs them against the live app with Playwright, writes a Markdown report.",
+  "description": "Zero-AI QA runner for the slshop.cloud dashboard: reads test cases from a Google Sheet or CSV/XLSX, runs them in a real browser, reports what passes and fails.",
   "scripts": {
-    "start": "tsx src/cli.ts",
+    "start": "tsx src/web/server.ts",
+    "dev": "tsx watch src/web/server.ts",
+    "cli": "tsx src/cli.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
@@ -15,5 +17,9 @@
     "playwright": "^1.64.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "marked": "^18.1.1"
   }
 }

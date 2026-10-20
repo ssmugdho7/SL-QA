@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { chromium, type Browser, type BrowserContext } from 'playwright';
 import { config } from './config.js';
-import { Api } from './api.js';
+import { Api } from './apps/slshop/api.js';
 
 export interface Session {
   browser: Browser;
@@ -39,19 +39,11 @@ export async function startSession(headed = false): Promise<Session> {
       });
       // tsx compiles functions passed to page.evaluate with a __name helper that does not exist in the page.
       await context.addInitScript('globalThis.__name = (fn) => fn;');
-      // Keep a copy of anything the page copies, so clipboard checks work even where the real clipboard is unavailable.
-      await context.addInitScript(() => {
-        const w = window as unknown as { __btbClipboard: string[] };
-        w.__btbClipboard = [];
-        const clip = navigator.clipboard;
-        if (clip) {
-          const original = clip.writeText.bind(clip);
-          clip.writeText = (text: string) => {
-            w.__btbClipboard.push(text);
-            return original(text).catch(() => undefined);
-          };
-        }
-      });
+      // Each test starts on the default store, whatever a previous test switched to (only on the first load of a tab,
+      // so a store switch inside a test survives reloads).
+      if (!opts.loggedOut) {
+        await context.addInitScript(`try { if (!sessionStorage.getItem('btb-store')) { localStorage.setItem('store_id', '${storeId}'); sessionStorage.setItem('btb-store', '1'); } } catch {}`);
+      }
       return context;
     },
     close: () => browser.close(),

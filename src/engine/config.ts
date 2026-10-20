@@ -7,14 +7,16 @@ function required(name: string): string {
 }
 
 export const config = {
-  sheetId: required('SHEET_ID'),
-  sheetGid: required('SHEET_GID'),
   baseUrl: required('BASE_URL').replace(/\/$/, ''),
   apiUrl: required('API_URL').replace(/\/$/, ''),
   phone: required('LOGIN_PHONE'),
   password: required('LOGIN_PASSWORD'),
+  /** Password for the web app (HTTP basic auth). Empty = no login. */
+  appPassword: process.env.APP_PASSWORD ?? '',
+  port: Number(process.env.PORT ?? 4100),
   authFile: '.auth/state.json',
   runsDir: 'runs',
+  dataDir: 'data',
   // Every record the bot creates carries this prefix so it is easy to spot and clean up.
   fixturePrefix: 'BTB',
 };

@@ -1,4 +1,4 @@
-import { config } from './config.js';
+import { config } from '../../config.js';
 
 export interface Product {
   id: number;
@@ -15,17 +15,22 @@ export interface Product {
   is_low_stock: boolean;
   is_out_of_stock: boolean;
   total_sold: number;
+  category_id: number | null;
   category: { id: number; name: string } | null;
   brand: { id: number; name: string } | null;
   variants: { id: number; name: string; sku: string; price: string; stock: number }[];
 }
 
-export interface Kpis { total: number; active: number; low_stock: number; out_of_stock: number }
-export interface StatusCounts { all: number; active: number; draft: number; archived: number }
+export interface Category { id: number; name: string; products_count: number }
+export interface Store { id: number; name: string }
 
-/** Thin client for the app's own REST API. Used to build and clean up test data and to cross-check what the UI shows. */
+/** Thin client for the slshop REST API. Used to build and clean up test data and to cross-check what the UI shows. */
 export class Api {
   constructor(private token: string, public storeId: number) {}
+
+  forStore(storeId: number): Api {
+    return new Api(this.token, storeId);
+  }
 
   async request<T = any>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await fetch(config.apiUrl + path, {
@@ -43,7 +48,11 @@ export class Api {
     return text ? JSON.parse(text) : (undefined as T);
   }
 
-  async listProducts(query = ''): Promise<{ data: Product[]; meta: { total: number; kpis: Kpis; status_counts: StatusCounts } }> {
+  async stores(): Promise<Store[]> {
+    return (await this.request<{ stores: Store[] }>('GET', '/auth/me')).stores;
+  }
+
+  async listProducts(query = ''): Promise<{ data: Product[]; meta: { total: number } }> {
     return this.request('GET', `/catalog/products?per_page=100${query ? '&' + query : ''}`);
   }
 
@@ -62,7 +71,7 @@ export class Api {
     return (await this.request('GET', `/catalog/products/${id}`)).data;
   }
 
-  async createProduct(fields: Partial<Product> & { name: string; price?: number; current_stock?: number; [k: string]: unknown }): Promise<Product> {
+  async createProduct(fields: { name: string; [k: string]: unknown }): Promise<Product> {
     const body = {
       product_type: 'simple', category_id: null, brand_id: null, tax_rate_id: null, tax_inclusive: false,
       supplier_id: null, warehouse_id: null, unit: 'pcs', channels: 'both', wholesale_enabled: false,
@@ -74,6 +83,19 @@ export class Api {
     return (await this.request('POST', '/catalog/products', body)).data;
   }
 
+  /** The update endpoint wants the whole product, so read it, change the fields and send it back. */
+  async updateProduct(id: number, fields: Record<string, unknown>): Promise<Product> {
+    const p = await this.getProduct(id);
+    const body = { ...p, price: p.price === null ? null : Number(p.price), category_id: p.category?.id ?? null, brand_id: p.brand?.id ?? null, label_ids: [], media_ids: [], ...fields };
+    return (await this.request('PUT', `/catalog/products/${id}`, body)).data;
+  }
+
+  async adjustStock(id: number, type: 'in' | 'out', quantity: number): Promise<void> {
+    const stocks = await this.request<{ warehouses?: { warehouse_id: number }[] }>('GET', `/catalog/products/${id}/stocks`);
+    const warehouseId = stocks.warehouses?.[0]?.warehouse_id;
+    await this.request('POST', `/catalog/products/${id}/adjust-stock`, { warehouse_id: warehouseId, type, quantity, sync_to_accounts: false });
+  }
+
   /** The app has no hard delete: deleted products move to the Archived tab. */
   async deleteProducts(ids: number[]): Promise<void> {
     if (ids.length) await this.request('POST', '/catalog/products/bulk', { ids, action: 'delete' });
@@ -83,15 +105,15 @@ export class Api {
     await this.request('POST', `/catalog/products/${id}/restore`);
   }
 
-  async bulk(ids: number[], action: string, extra: Record<string, unknown> = {}): Promise<void> {
-    await this.request('POST', '/catalog/products/bulk', { ids, action, ...extra });
+  async bulk(ids: number[], action: string): Promise<void> {
+    await this.request('POST', '/catalog/products/bulk', { ids, action });
   }
 
-  async categories(): Promise<{ id: number; name: string; products_count: number }[]> {
+  async categories(): Promise<Category[]> {
     return (await this.request('GET', '/catalog/categories')).data;
   }
 
-  async createCategory(name: string): Promise<{ id: number; name: string }> {
+  async createCategory(name: string): Promise<Category> {
     return (await this.request('POST', '/catalog/categories', { name, is_active: true })).data;
   }
 
@@ -103,7 +125,7 @@ export class Api {
     return this.request('GET', `/catalog/products/${id}/deletion-preview`);
   }
 
-  async productOrders(id: number): Promise<{ orders: { reference: string }[] }> {
+  async productOrders(id: number): Promise<{ orders: { order_id: number; reference: string }[] }> {
     return this.request('GET', `/catalog/products/${id}/orders`);
   }
 }
