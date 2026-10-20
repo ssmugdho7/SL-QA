@@ -56,7 +56,8 @@ export function planFixtures(t: CaseContextLike): Plan {
   const selectCount = Math.max(0, ...[...steps.matchAll(/select (?:the same )?(\d+)/gi)].map((m) => Number(m[1])), /mixed selection/i.test(data) ? 2 : 0);
   const many = Math.max(selectCount, /test products?|products? (that has |with )no orders/i.test(text) ? Math.max(1, ...counts.filter((n) => n <= 5)) : 0);
 
-  if (/variable product|variants?:|view variants/i.test(text)) {
+  // "Locate a product marked Variable" in a bug report looks at the store's own products; only test cases that act on one get a fixture.
+  if (/variable product|variants?:|view variants/i.test(text) && !/\b(?:locate|observe|look at|find|view)\b[^.\n]*\bvariable\b/i.test(steps)) {
     add('Variable', { product_type: 'variable', price: null, variant_axes: ['Weight'], variants: VARIANTS });
   }
   if (/\b(\d+)-character name/i.test(text)) {
@@ -72,7 +73,7 @@ export function planFixtures(t: CaseContextLike): Plan {
   if (/track(ing)? inventory\s*=?\s*off|turn off 'track inventory'/i.test(text)) add('Untracked', { current_stock: 0, track_inventory: false });
 
   // A Bangla search or Bangla export needs a product with a Bangla name; the store may not have one.
-  const bangla = /bangla/i.test(text) ? `${plan.values.find((v) => /[\u0980-\u09FF]/.test(v)) ?? 'ইলিশ'} মাছ` : null;
+  const bangla = /\bbangla\b(?!desh)/i.test(text) ? `${plan.values.find((v) => /[\u0980-\u09FF]/.test(v)) ?? 'ইলিশ'} মাছ` : null;
   for (let i = plan.products.length; i < many; i++) add(i === many - 1 && bangla ? bangla : `Item ${i + 1}`, { current_stock: 5 });
   if (bangla && !plan.products.some((p) => p.suffix === bangla)) add(bangla, { current_stock: 5 });
   // Any case that changes a product (duplicate, delete, stock, status, edit) gets one of its own.

@@ -6,6 +6,7 @@ import { config } from '../engine/config.js';
 import { casesFromSheet } from '../engine/sources/google-sheet.js';
 import { casesFromUpload } from '../engine/sources/upload.js';
 import { rowUrl, splitList, type TestCase } from '../engine/sources/cases.js';
+import { parseBugText } from '../engine/sources/bug-text.js';
 import { EXAMPLE_CASES, EXAMPLE_SUITE_NAME, exampleCsv } from './example.js';
 import { cancel, enqueue, recover } from './runner.js';
 import { newId, runs, suites, uploadsDir, type Run, type Suite } from './store.js';
@@ -168,6 +169,19 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       const removed = [...new Set([...(s.removed ?? []), ...gone.filter((c) => !c.manual).map((c) => c.id)])];
       suites.save({ ...s, cases: s.cases.filter((c) => !ids.has(c.id)), removed });
       return back(`Deleted ${gone.length} case${gone.length === 1 ? '' : 's'}.`);
+    }
+
+    // "Fill the form from it": read a pasted bug report into the fields, and show them for checking before saving.
+    if (field(form, 'then') === 'parse') {
+      const text = field(form, 'paste');
+      const editing = targetId ? s.cases.find((c) => c.id === targetId) : undefined;
+      if (!text) return send(res, 422, issueFormPage(s, editing, 'Paste a bug report first.'));
+      const bug = parseBugText(text);
+      const filled = { ...(editing ?? {}), id: field(form, 'id') || editing?.id || '', title: bug.title, url: bug.url, reported: bug.reported, preconditions: bug.preconditions, priority: field(form, 'priority'), scenario: field(form, 'scenario'),
+        steps: [bug.steps.map((x, i) => `${i + 1}. ${x}`).join('\n')], expected: [bug.expected.map((x) => `• ${x}`).join('\n')] } as TestCase;
+      const found = [bug.steps.length && `${bug.steps.length} steps`, bug.expected.length && `${bug.expected.length} expected result${bug.expected.length === 1 ? '' : 's'}`, bug.url && `page ${bug.url}`].filter(Boolean).join(', ');
+      const msg = found ? `Read the report: ${found}. Check the fields below, then save.` : 'Could not find the sections in that text. Look for "Steps to reproduce:" and "Expected result:" headings, or fill the fields by hand.';
+      return send(res, 200, issueFormPage(s, editing, msg, filled));
     }
 
     // Add or edit one issue.

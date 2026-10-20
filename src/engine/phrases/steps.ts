@@ -3,8 +3,9 @@ import path from 'path';
 import type { Locator } from 'playwright';
 import { config } from '../config.js';
 import { Blocked, type CaseContext } from '../context.js';
-import { Missing, exactText } from '../ui.js';
+import { Missing, escapeRe, exactText } from '../ui.js';
 import { emptyCategory, resolveCategory } from './fixtures.js';
+import { pagePath } from '../pages.js';
 import { lc, quoted } from './text.js';
 
 /**
@@ -98,7 +99,7 @@ async function ensureSelection(t: CaseContext): Promise<void> {
   await bar.waitFor({ timeout: 5_000 }).catch(() => undefined);
 }
 
-async function clickNamed(t: CaseContext, name: string, opts: { inRow?: string } = {}): Promise<void> {
+export async function clickNamed(t: CaseContext, name: string, opts: { inRow?: string } = {}): Promise<void> {
   const ui = t.ui;
   const re = exactText(name);
   if (BULK_ACTIONS.test(name) && !(await ui.dialog().count())) await ensureSelection(t);
@@ -128,8 +129,16 @@ async function clickNamed(t: CaseContext, name: string, opts: { inRow?: string }
       if (clicked) return;
     }
   }
+  // A label with extra text after the name: 'Checkout' → "Checkout ৳650.00", 'Discount or coupon' field.
+  const starts = new RegExp(`^\\s*${escapeRe(name)}(?![\\p{L}\\p{N}])`, 'iu');
+  for (const c of [ui.dialog().getByRole('button', { name: starts }), ui.page.getByRole('button', { name: starts }), ui.page.getByRole('link', { name: starts }), ui.page.getByRole('tab', { name: starts })]) {
+    const visible = c.filter({ visible: true }).first();
+    if (await visible.count().catch(() => 0)) {
+      if (await visible.click({ timeout: 5_000 }).then(() => true).catch(() => false)) return;
+    }
+  }
   // Row-level controls ("More actions", "View variants", "Quick view", "Adjust stock") belong to a product row.
-  const inRow = await rowName(t, '').catch(() => null);
+  const inRow = t.fixtures.length || (await ui.isListPage()) ? await rowName(t, '').catch(() => null) : null;
   if (inRow) {
     const row = ui.row(inRow);
     const target = row.getByLabel(re).or(row.getByRole('button', { name: re })).first();
@@ -285,7 +294,7 @@ export const STEP_RULES: StepRule[] = [
       if (/^(another|one|a|the)\b.*\bproduct\b/i.test(page) || /^product$/i.test(page)) return;
       if (/detail/i.test(page)) return;
       if (lc(page) === lc(pageTitle(t.startPath)) || /^dashboard$/i.test(page) === false) {
-        const target = lc(page) === lc(pageTitle(t.startPath)) ? t.startPath : await sidebarPath(t, page);
+        const target = lc(page) === lc(pageTitle(t.startPath)) ? t.startPath : pagePath(page) ?? (await sidebarPath(t, page));
         await t.ui.goto(target);
         t.state = { filters: {}, store: t.state.store, loggedOut: t.state.loggedOut };
         return;
@@ -909,7 +918,7 @@ export function pageTitle(p: string): string {
 }
 
 /** Finds a sidebar link by its label ("Products", "Orders") and returns its path. */
-async function sidebarPath(t: CaseContext, label: string): Promise<string> {
+export async function sidebarPath(t: CaseContext, label: string): Promise<string> {
   const href = await t.page.evaluate((l) => {
     const want = l.toLowerCase();
     const links = [...document.querySelectorAll('nav a[href^="/dashboard"]')] as HTMLAnchorElement[];

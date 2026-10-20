@@ -31,6 +31,14 @@ A step-by-step guide for non-technical users is built into the app at **/help** 
 - **Edit** / **Delete** on each row, **Delete ticked**, and **Delete all issues** on the suite page. **Delete run** on a run page removes its report and screenshots.
 - On a Google Sheet suite, rows deleted here stay hidden when the sheet is re-read, and rows edited here keep your version.
 
+### Pasting a bug report from Jira
+
+On **＋ Add case**, paste a whole bug report into **Paste a bug report** and click **Fill the form from it**. The bot reads the title (first line), `Pre-condition:`, `Steps to reproduce:` (numbered lines), `Actual result:` and `Expected result:` (a paragraph is split into its points), and takes the page from the "Navigate to … page" step or a slshop.cloud link. Image references such as `[^bug 2.png]` are dropped. A sheet can do the same with a **Description** column holding the whole report.
+
+Plain steps it follows include: *Go to https://slshop.cloud/dashboard*, *Navigate to Create order/POS page*, *Add a product to the cart (e.g; …)*, *Click Checkout button to open the form*, *Fill up all the required fields* (test customer **BTB Test**, 01700000000), *Type a value that exceeds the total (e.g., type 900)*, *Click the Place order button* (**places a real order** and records its number), *Check the receipt*, *Click the Sort button … and select a different sorting rule*, and *View / Observe / Locate …* (look only).
+
+Expected results it can judge by measuring the page: an input that should be blocked above the total, an alert or error that should appear, a total that should stay above ৳0, names that should wrap instead of being cut off, a side panel that should collapse or leave room, variable products that should show a price range instead of ৳0.00, and #1/#2 labels that should follow their cards after sorting. Each check reports the numbers it saw.
+
 ### Sheet format
 
 | Column | Required | Notes |
@@ -42,7 +50,7 @@ A step-by-step guide for non-technical users is built into the app at **/help** 
 | URL (or Page / Link) | no | Page the row is tested on. Without it, the first slshop.cloud link or `/dashboard/…` path in the row is used, else the suite's start page. |
 | Test Scenario, Type, Priority, Preconditions, Test Data | no | Test Data values in quotes (`'tuna' / 'ইলিশ'`) are used by the "type …" steps, in order. |
 
-Free-form bug sheets work too: only an **Expected Result** (or a URL) column is required. `ID`, `Title`/`Summary`/`Issue` and `Steps`/`Steps to Reproduce` are also accepted. Rows without an ID get `ROW-<n>`.
+Free-form bug sheets work too: only an **Expected Result**, a **Description** holding a Jira-style report, or a URL column is required. `ID`, `Title`/`Summary`/`Issue` and `Steps`/`Steps to Reproduce` are also accepted. Rows without an ID get `ROW-<n>`.
 
 ### What happens per row
 
@@ -70,10 +78,13 @@ Cases that change data create their own products, named `BTB <case id> …`, and
 
 ```
 src/engine/
-  sources/      Google Sheet / CSV / XLSX → test cases
+  sources/      Google Sheet / CSV / XLSX / pasted bug report (bug-text.ts) → test cases
+  pages.ts      page names ("Create order/POS", "Orders") → dashboard paths
   phrases/
     split.ts    sentence → separate actions / claims
     steps.ts    step rules: wording → browser action
+    natural.ts  plain-language step rules from bug reports (add to cart, fill required fields, type a value, sort…)
+    behaviour.ts checks for behaviour-style expected results (input limits, alerts, clipped text, panels, prices, labels)
     expects.ts  expectation rules: wording → checks (reads page snapshots taken after every step)
     fallback.ts checks for claims no rule matches (quoted text on the page, no errors, login redirect)
     fixtures.ts Test Data / preconditions → test products to create

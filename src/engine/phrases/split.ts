@@ -4,7 +4,7 @@ import { splitKeep } from './text.js';
 const ACTION_VERBS = [
   'apply', 'change', 'check', 'choose', 'clear', 'click', 'close', 'compare', 'confirm', 'create', 'enter', 'find', 'go', 'log', 'look',
   'note', 'open', 'paste', 'pick', 'press', 'refresh', 'reload', 'repeat', 'return', 'save', 'scroll', 'select', 'set', 'switch',
-  'tick', 'turn', 'type', 'use', 'wait',
+  'tick', 'turn', 'type', 'use', 'wait', 'add', 'fill', 'navigate', 'observe', 'view', 'locate', 'tap', 'visit', 'verify',
 ].join('|');
 
 const STEP_SEPARATOR = new RegExp(
@@ -34,7 +34,8 @@ export function stepClauses(step: string): Clause[] {
 }
 
 const HAS_VERB = /\b(should|must)\b/i;
-const EXPECT_SEPARATOR = /\s*;\s*|\s*,\s*(?:and\s+)?|\s+and\s+|\s+—\s+/g;
+// Also splits sentences ("… total. If …") and "A should X or the layout should Y" (two separate claims).
+const EXPECT_SEPARATOR = /\s*;\s*|\s*,\s*(?:and\s+)?|\s+and\s+|\s+—\s+|(?<=[\p{Ll}\d)'"])\.\s+(?=\p{Lu})|\s+or\s+(?=the\s+(?:layout|page|panel|grid|screen|design)\b[\w\s-]{0,30}?\s+should\b)/gu;
 
 /**
  * One expected-result sentence → its separate claims.

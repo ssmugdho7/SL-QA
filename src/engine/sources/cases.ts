@@ -1,3 +1,5 @@
+import { looksLikeBugText, parseBugText } from './bug-text.js';
+
 export interface TestCase {
   id: string;
   scenario: string;
@@ -25,7 +27,8 @@ export const REQUIRED_COLUMNS = ['Expected Result'];
 /** Column names accepted for each field; QA test sheets and free-form bug sheets name them differently. */
 const ALIASES: Record<string, string[]> = {
   id: ['TC ID', 'ID', 'Bug ID', 'Issue ID', 'Case ID', 'Key'],
-  title: ['Test Case', 'Title', 'Summary', 'Issue', 'Bug', 'Description'],
+  title: ['Test Case', 'Title', 'Summary', 'Issue', 'Bug'],
+  description: ['Description', 'Bug Report', 'Details', 'Report'],
   steps: ['Test Steps', 'Steps', 'Steps to Reproduce', 'Steps To Reproduce', 'Repro Steps'],
   expected: ['Expected Result', 'Expected', 'Expected Behaviour', 'Expected Behavior', 'Expected Outcome'],
   actual: ['Actual Result', 'Actual', 'Actual Behaviour', 'Actual Behavior'],
@@ -36,16 +39,35 @@ export function casesFromRows(rows: Record<string, string>[]): TestCase[] {
   const headers = rows.length ? Object.keys(rows[0]) : [];
   const column = (field: string) => ALIASES[field].find((a) => headers.some((h) => h.trim().toLowerCase() === a.toLowerCase()));
   const key = (name: string | undefined) => (name ? headers.find((h) => h.trim().toLowerCase() === name.toLowerCase())! : '');
-  const [idKey, titleKey, stepsKey, expectedKey, actualKey] = ['id', 'title', 'steps', 'expected', 'actual'].map((f) => key(column(f)));
-  if (rows.length && !expectedKey && !URL_COLUMNS.some((c) => c in rows[0])) throw new Error(`Sheet is missing columns: ${REQUIRED_COLUMNS.join(', ')} (or a URL column)`);
+  const [idKey, titleKey, stepsKey, expectedKey, actualKey, descKey] = ['id', 'title', 'steps', 'expected', 'actual', 'description'].map((f) => key(column(f)));
+  if (rows.length && !expectedKey && !descKey && !URL_COLUMNS.some((c) => c in rows[0])) throw new Error(`Sheet is missing columns: ${REQUIRED_COLUMNS.join(', ')} (or a URL or Description column)`);
   const cell = (r: Record<string, string>, k: string) => (k ? (r[k] ?? '').toString().trim() : '');
 
   return rows
     .map((r, i) => ({ r, n: i + 2 }))
     .filter(({ r }) => !/^Scenario\s+\d+/i.test(cell(r, idKey)))
-    .filter(({ r }) => (idKey ? cell(r, idKey) : cell(r, expectedKey) || rowUrl(r)))
+    .filter(({ r }) => (idKey ? cell(r, idKey) : cell(r, expectedKey) || cell(r, descKey) || rowUrl(r)))
     .map(({ r, n }) => {
       const expected = cell(r, expectedKey);
+      // A whole bug report pasted into one cell (Jira style): read its sections; filled-in columns still win.
+      const desc = cell(r, descKey);
+      const bug = desc && looksLikeBugText(desc) ? parseBugText(`${cell(r, titleKey)}\n${desc}`) : null;
+      if (bug) {
+        return {
+          id: cell(r, idKey) || `ROW-${n}`,
+          scenario: cell(r, 'Test Scenario'),
+          title: cell(r, titleKey) || bug.title,
+          type: cell(r, 'Type') || 'Bug',
+          priority: cell(r, 'Priority'),
+          preconditions: cell(r, 'Preconditions') || bug.preconditions,
+          steps: cell(r, stepsKey) ? splitList(cell(r, stepsKey), /^\d+[.)]\s*/) : bug.steps,
+          testData: cell(r, 'Test Data'),
+          expected: expected ? splitList(expected, /^[•\-*]\s*/) : bug.expected,
+          automation: cell(r, 'Automation'),
+          url: URL_COLUMNS.some((k) => (r[k] ?? '').toString().trim()) ? rowUrl(r) : bug.url,
+          reported: cell(r, actualKey) || bug.reported,
+        };
+      }
       return {
         id: cell(r, idKey) || `ROW-${n}`,
         scenario: cell(r, 'Test Scenario'),

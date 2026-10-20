@@ -49,6 +49,18 @@ export const EXAMPLE_CASES: TestCase[] = [
   },
 ];
 
+/** A bug as testers write it in Jira, for the "paste a bug report" part of the guide. Read-only: no order is placed. */
+export const EXAMPLE_JIRA = `Create Order/POS: Product titles are clipped on sales cards and the right-hand panel wastes space
+Pre-condition: User should Create store or Sign-in to ShopLagbe
+Steps to reproduce:
+1. Go to https://slshop.cloud/dashboard
+2. Navigate to Create order/ POS page
+3. View the product inventory grid on the left-hand side
+4. Observe items with long names
+5. Observe the right-hand "Start a new sale" cart panel when no items are active
+Actual result: Product titles are clipped on sales cards and the right-hand panel creates excessive empty screen space. Please see [^ShopLagbe_bug 2.png]
+Expected result: Product titles should dynamically wrap up to 2 lines so the full item name is readable or the layout should either allow the right-hand panel to be collapsible or utilize a responsive grid that expands the inventory catalog to full width until an item is added to the cart.`;
+
 /** The example as a sheet, in the column layout the help page describes. */
 export function exampleCsv(): string {
   const cell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);

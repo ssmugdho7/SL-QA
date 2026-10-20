@@ -48,6 +48,12 @@ export class Api {
     return text ? JSON.parse(text) : (undefined as T);
   }
 
+  /** Newest orders first (reference, customer, totals). */
+  async recentOrders(n = 5): Promise<{ id: number; reference: string; customer?: { name?: string }; subtotal?: string; total: string; discount?: string; status: string; created_at: string }[]> {
+    const r = await this.request<{ data: any[] }>('GET', `/sales/orders?per_page=${n}`);
+    return (r.data ?? []).map((o) => ({ ...o, reference: o.reference ?? o.order_number ?? `#${o.id}` }));
+  }
+
   async stores(): Promise<Store[]> {
     return (await this.request<{ stores: Store[] }>('GET', '/auth/me')).stores;
   }

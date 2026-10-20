@@ -1,7 +1,7 @@
 import type { CaseResult, Check, Verdict } from '../engine/context.js';
 import { previewCase } from '../engine/phrases/index.js';
 import type { TestCase } from '../engine/sources/cases.js';
-import { EXAMPLE_CASES } from './example.js';
+import { EXAMPLE_CASES, EXAMPLE_JIRA } from './example.js';
 import type { Run, Suite } from './store.js';
 
 export const esc = (s: unknown) =>
@@ -373,8 +373,14 @@ export function issueFormPage(s: Suite, editing?: TestCase, flash?: string, type
     `<p class="crumbs"><a href="/">Suites</a> / <a href="/suites/${s.id}">${esc(s.name)}</a> /</p>
     <h1>${editing ? `Edit ${esc(editing.id)}` : 'Add a case'}</h1>
     <p class="sub">A case is one bug, or one thing to check. The bot will open the page, follow the steps, and compare what <b>should</b> happen with what the page really does.</p>
-    ${flash ? `<div class="alert${/^Added/.test(flash) ? ' info' : ''}" role="${/^Added/.test(flash) ? 'status' : 'alert'}">${esc(flash)}</div>` : ''}
+    ${flash ? `<div class="alert${/^(Added|Read the report)/.test(flash) ? ' info' : ''}" role="${/^(Added|Read the report)/.test(flash) ? 'status' : 'alert'}">${esc(flash)}</div>` : ''}
     <form method="post" action="/suites/${s.id}/issues${editing ? `/${encodeURIComponent(editing.id)}` : ''}" class="card stack issue-form">
+      <details class="paste"${editing || raw ? '' : ' open'}><summary><b>Paste a bug report</b> <span class="sub">from Jira, email or chat; the form fills itself</span></summary>
+        <div class="stack" style="margin-top:10px">
+          <textarea name="paste" rows="7" placeholder="Products: Variable products show &quot;Price 0.00&quot;\nPre-condition: User is signed in.\nSteps to reproduce:\n1. Navigate to Products page\n2. Locate a product marked &quot;Variable&quot;\nActual result: The card shows ৳0.00.\nExpected result: The card should show the price range from the variants."></textarea>
+          <span class="hint">Paste the whole report as it is: title on the first line, then <b>Pre-condition</b>, <b>Steps to reproduce</b> (numbered), <b>Actual result</b> and <b>Expected result</b>. Image and video references are ignored. <a href="/help#paste" target="_blank">What the bot understands</a></span>
+          <div><button name="then" value="parse" formnovalidate>Fill the form from it ↓</button></div>
+        </div></details>
       <label><span>Title <span class="req">required</span></span>
         <input name="title" value="${v(c?.title)}" placeholder="Export button missing on Customers page" required maxlength="200">
         <span class="hint">A short name for the problem.</span></label>
@@ -383,13 +389,13 @@ export function issueFormPage(s: Suite, editing?: TestCase, flash?: string, type
         <span class="hint">Where the problem happens. A full link, or just the part starting with <code>/dashboard/</code>.${s.source.kind === 'manual' ? '' : ` Empty = the suite's start page (<code>${esc(s.pagePath)}</code>).`}</span></label>
       <label><span>Expected result <span class="req">required</span></span>
         <textarea name="expected" rows="4" required placeholder="• The 'Export page' button should be visible.\n• The page should load without errors.">${raw ? v(c?.expected) : v(c?.expected.map((e) => `• ${e}`))}</textarea>
-        <span class="hint">What <b>should</b> happen, one point per line. Put button and text names in 'single quotes', exactly as on screen. <a href="/help#writing" target="_blank">Tips</a></span></label>
+        <span class="hint">What <b>should</b> happen, one point per line (a paragraph also works). Names in 'single quotes' are checked exactly as written. <a href="/help#writing" target="_blank">Tips</a></span></label>
       <label><span>What actually happens <span class="opt">optional</span></span>
         <textarea name="actual" rows="2" placeholder="There is no Export button; only 'Add Customer' is shown.">${v(c?.reported)}</textarea>
         <span class="hint">What you saw. Shown in the report next to what the bot finds.</span></label>
       <label><span>Steps to reproduce <span class="opt">optional</span></span>
         <textarea name="steps" rows="4" placeholder="1. Open the customers page\n2. Click 'Filter'">${raw ? v(c?.steps) : v(c?.steps.map((x, i) => `${i + 1}. ${x}`))}</textarea>
-        <span class="hint">Leave empty if the problem is visible as soon as the page opens. One step per line, starting with an action (Open, Click, Type…).</span></label>
+        <span class="hint">Leave empty if the problem is visible as soon as the page opens. One step per line, in plain words, as you would write them in Jira: <i>Navigate to Orders page</i>, <i>Click the Sort button</i>, <i>Add a product to the cart</i>.</span></label>
       <div class="grid2">
         <label>Priority <select name="priority">${['', 'High', 'Medium', 'Low'].map((p) => `<option ${c?.priority === p ? 'selected' : ''} value="${p}">${p || '—'}</option>`).join('')}</select></label>
         <label><span>ID <span class="opt">optional</span></span><input name="id" value="${v(c?.id)}" placeholder="Leave empty to get ISSUE-${s.cases.length + 1}" maxlength="40"></label>
@@ -446,7 +452,7 @@ export function helpPage(): string {
 
     <section class="glance"><h2>The whole thing in 30 seconds</h2>
       <ol class="flow">
-        <li><b>Make a list</b><span>A Google Sheet, an Excel/CSV file, or typed into the app. One row = one case.</span></li>
+        <li><b>Make a list</b><span>A Google Sheet, an Excel/CSV file, typed into the app, or a bug report pasted from Jira. One row = one case.</span></li>
         <li><b>Add it as a suite</b><span>On <a href="/">Suites</a>, under <i>Add a test suite</i>.</span></li>
         <li><b>Press Run</b><span>The robot visits each page and checks it. About 10–60 seconds per case.</span></li>
         <li><b>Read the report</b><span>Pass, Fail and the reason, with screenshots.</span></li>
@@ -455,7 +461,7 @@ export function helpPage(): string {
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
       <a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -467,9 +473,10 @@ export function helpPage(): string {
         <tr><td><b>Test Case</b> <span class="sub">(Title, Summary, Issue)</span></td><td>No</td><td>A one-line title.</td></tr>
         <tr><td><b>Test Steps</b> <span class="sub">(Steps, Steps to Reproduce)</span></td><td>No</td><td>What to do on the page before checking, one step per line: <code>1. Click 'Filter'</code>.</td></tr>
         <tr><td><b>Actual Result</b> <span class="sub">(Actual)</span></td><td>No</td><td>What a person saw. It's shown in the report next to what the bot found.</td></tr>
+        <tr><td><b>Description</b> <span class="sub">(Bug Report, Details)</span></td><td>No</td><td>A whole bug report in one cell, copied from Jira: <i>Pre-condition</i>, <i>Steps to reproduce</i>, <i>Actual result</i>, <i>Expected result</i>. The bot reads the sections out of it (see <a href="#paste">Paste a bug report</a>). A sheet with only <b>Title</b> and <b>Description</b> columns works.</td></tr>
         <tr><td>Priority, Test Scenario, Preconditions, Test Data</td><td>No</td><td>Shown in the report. <i>Test Scenario</i> groups cases so you can run one group. <i>Test Data</i> values in quotes are used by "type …" steps.</td></tr>
       </tbody></table>
-      <p class="sub">* A row needs an Expected Result <b>or</b> a URL. A row with only a URL still gets a page-health check (see step 5).</p>
+      <p class="sub">* A row needs an Expected Result, a Description with an expected result in it, <b>or</b> a URL. A row with only a URL still gets a page-health check (see step 5).</p>
       <p><a class="button" href="/help/sample.csv" download>⬇ Download a sample sheet</a> <span class="sub">Open it in Google Sheets or Excel and replace the rows with your own.</span></p>
       <div class="tip"><b>Using Google Sheets?</b> Click <b>Share</b> → <b>General access</b> → <b>Anyone with the link</b> → <b>Viewer</b>. Otherwise SL QA can't read it.</div>
     </section>
@@ -539,7 +546,7 @@ export function helpPage(): string {
     <section id="manage"><h2>Add, edit or delete cases</h2>
       <p>You don't need a sheet for every bug. You can type cases straight into SL QA.</p>
       <ul>
-        <li><b>Add a case:</b> open a suite and click <b>＋ Add case</b>. Fill in a <b>Title</b> and the <b>Expected result</b> (what should happen). The <b>Page link</b> is required in a suite typed by hand; in a sheet suite, an empty link means the suite's start page. You can also add what actually happens, the steps, a priority and an ID. Then:
+        <li><b>Add a case:</b> open a suite and click <b>＋ Add case</b>. Already have the bug in Jira? Paste it into <b>Paste a bug report</b> at the top and click <b>Fill the form from it</b> (see <a href="#paste">below</a>). Otherwise fill in a <b>Title</b> and the <b>Expected result</b> (what should happen). The <b>Page link</b> is required in a suite typed by hand; in a sheet suite, an empty link means the suite's start page. You can also add what actually happens, the steps, a priority and an ID. Then:
           <ul>
             <li><b>Add case</b>: save it.</li>
             <li><b>Add and check it now</b>: save it and run it straight away.</li>
@@ -555,15 +562,61 @@ export function helpPage(): string {
       <div class="tip">Rows deleted from a Google Sheet suite stay hidden when you click <b>Re-read sheet</b>, and the suite page shows how many are hidden. To get one back, click <b>＋ Add case</b> and enter it again with the same ID. Cases you deleted that were typed in by hand can't be recovered.</div>
     </section>
 
+    <section id="paste"><h2>Paste a bug report from Jira</h2>
+      <p>You don't have to rewrite bugs for the bot. Copy the description from Jira (or an email or chat) and paste it as it is:</p>
+      <ol>
+        <li>Open a suite, click <b>＋ Add case</b>.</li>
+        <li>In <b>Paste a bug report</b> at the top, paste the whole text, title included.</li>
+        <li>Click <b>Fill the form from it</b>. The title, page, steps, actual and expected results are filled in for you. Check them, then click <b>Add and check it now</b>.</li>
+      </ol>
+      <p>The bot looks for these headings (upper or lower case, with or without the colon):</p>
+      <table class="stack-sm"><thead><tr><th>Heading</th><th>What it becomes</th></tr></thead><tbody>
+        <tr><td>First line, or <code>Summary:</code></td><td>The title.</td></tr>
+        <tr><td><code>Pre-condition:</code></td><td>Preconditions. "Sign in to ShopLagbe" needs nothing: the bot is always logged in.</td></tr>
+        <tr><td><code>Steps to reproduce:</code></td><td>The steps, one per numbered line. Repeated numbers (two "5.") are fine.</td></tr>
+        <tr><td><code>Actual result:</code></td><td>What the tester saw, shown in the report.</td></tr>
+        <tr><td><code>Expected result:</code></td><td>What the bot checks. A paragraph is split into its separate points.</td></tr>
+      </tbody></table>
+      <p>The <b>page</b> comes from the step that says where to go (<i>Navigate to Create order/POS page</i> → <code>/dashboard/pos</code>), or from a slshop.cloud link. References like <code>Please see [^bug 2.png]</code> are ignored.</p>
+
+      <h3>Steps the bot can follow</h3>
+      <table class="stack-sm"><thead><tr><th>You write</th><th>The bot does</th></tr></thead><tbody>
+        <tr><td><code>Go to https://slshop.cloud/dashboard</code>, <code>Go to ShopLagbe: merchant dashboard</code></td><td>Opens the dashboard.</td></tr>
+        <tr><td><code>Navigate to Create order/POS page</code>, <code>Navigate to Orders page</code></td><td>Opens that page (any name from the left menu works).</td></tr>
+        <tr><td><code>Add a product to the cart (e.g; Stun Gun …)</code></td><td>On POS, clicks <b>Add</b> on that product, or on the first product in stock if it isn't in the store (the report says so).</td></tr>
+        <tr><td><code>Click Checkout button to open the form</code>, <code>Click the Sort button at the top</code></td><td>Clicks the button with that name. Extra words after the name ("Checkout ৳650.00") are fine.</td></tr>
+        <tr><td><code>Fill up all the required fields</code></td><td>Fills the form with a test customer: <b>BTB Test</b>, 01700000000, House 1, Road 1, Gulshan, Dhaka.</td></tr>
+        <tr><td><code>Type a value that exceeds the total (e.g., type 900 …)</code></td><td>Types 900 into the field just opened (or the discount field). If 900 isn't more than the real total, it types total + 100 and says so. It records what the field kept, the total before and after, and any message.</td></tr>
+        <tr><td><code>Click the Place order button</code></td><td><b>Places a real order</b> on the test store and records its number, total and discount.</td></tr>
+        <tr><td><code>Check the receipt</code></td><td>Opens that order and takes a screenshot.</td></tr>
+        <tr><td><code>Click the Sort button … and select a different sorting rule</code></td><td>Picks another sort option and remembers which card was #1, #2 … before and after.</td></tr>
+        <tr><td><code>View …</code>, <code>Observe …</code>, <code>Locate …</code>, <code>Look at …</code>, <code>Note …</code></td><td>Looks only. The check happens in the expected result.</td></tr>
+      </tbody></table>
+
+      <h3>Expected results the bot can judge</h3>
+      <table class="stack-sm"><thead><tr><th>Kind of expected result</th><th>What the bot measures</th></tr></thead><tbody>
+        <tr><td>"The field should <b>block</b> inputs that <b>exceed</b> the total"</td><td>After the typing step: did the field refuse or cap the value, or show a message? Includes the saved order if one was placed.</td></tr>
+        <tr><td>"The system should show an <b>alert</b> / error message"</td><td>Pop-up messages, alerts, red helper text and fields marked invalid that appeared after the last typing.</td></tr>
+        <tr><td>"The <b>total</b> should not be ৳0 / negative"</td><td>The amount next to <i>Total</i>.</td></tr>
+        <tr><td>"Titles should <b>wrap</b> up to 2 lines / be readable"</td><td>Every shortened name on the page: how many are cut off, and to how many lines.</td></tr>
+        <tr><td>"The panel should be <b>collapsible</b> / the grid should use the <b>full width</b>"</td><td>The width of the right-hand panel, whether it is empty, and whether it has a collapse button.</td></tr>
+        <tr><td>"Show the <b>price range</b> from the variants instead of 0.00"</td><td>Every variable product in the store: its card price against its variants' prices.</td></tr>
+        <tr><td>"The position <b>numbers</b> should <b>follow</b> the cards after sorting"</td><td>Each card's #N before and after the sort.</td></tr>
+        <tr><td>Anything with <b>'quoted text'</b>, "no errors", "no NaN", "redirect to login"</td><td>Checked on the page directly (see <a href="#writing">Writing sentences</a>).</td></tr>
+      </tbody></table>
+      <p>Open <b>How the bot reads it</b> under a case to see which rule each sentence got. A <b>?</b> means it wasn't understood: that sentence is skipped and the report says so. Every check in the report shows the numbers it measured, so you can judge it yourself.</p>
+      <div class="tip"><b>Heads-up:</b> a step like <i>Click the Place order button</i> really places an order on the test store, for the customer <b>BTB Test</b>. The report gives the order number. The cart is emptied when the case ends.</div>
+    </section>
+
     <section id="writing"><h2>Writing sentences the bot understands</h2>
-      <p>The bot recognises common ways of saying things. These habits help it the most:</p>
+      <p>Plain sentences like the ones in a Jira report work (see the tables <a href="#paste">above</a>). When you want to be exact, these habits help most:</p>
       <table class="stack-sm"><thead><tr><th>Do</th><th>Avoid</th></tr></thead><tbody>
-        <tr><td>Put button, tab and text names <b>in single quotes</b>, spelled exactly as on screen:<br><code>The 'Add Product' button should be visible.</code></td><td><code>There should be a button to add products.</code><br><span class="sub">The bot can't guess which button you mean.</span></td></tr>
-        <tr><td>One point per line, starting with <code>•</code></td><td>Several points in one long paragraph.</td></tr>
+        <tr><td>One action per step, in the order you'd do it, including how to open hidden panels: <code>Add a product to the cart</code> → <code>Click Checkout</code> → <code>Click the Discount or coupon field</code></td><td><code>Apply a big discount at checkout</code><br><span class="sub">The bot can't fill in the clicks in between.</span></td></tr>
+        <tr><td>Put exact button and text names <b>in single quotes</b> when the check is about that text:<br><code>The 'Add Product' button should be visible.</code></td><td><code>There should be a button to add products.</code></td></tr>
+        <tr><td>Say what you would see: <code>An alert message should be shown</code>, <code>The total should not be ৳0.00</code></td><td><code>It should behave properly</code></td></tr>
         <tr><td><code>The page should load without errors.</code></td><td><code>Page works fine</code></td></tr>
         <tr><td><code>The page should not show NaN or undefined values.</code></td><td><code>Numbers look right</code></td></tr>
         <tr><td><code>A logged-out user should be redirected to the login page.</code></td><td><code>Login is required</code></td></tr>
-        <tr><td>Steps that start with an action: <code>Click 'Filter'</code>, <code>Type 'tuna' in search</code>, <code>Open the orders page</code></td><td><code>Then the filter thing</code></td></tr>
       </tbody></table>
       <p>For "should not" points, quote the text: <code>The 'Delete' button should not be shown.</code></p>
     </section>
@@ -581,7 +634,7 @@ export function helpPage(): string {
         <dt>The Run button is greyed out</dt>
         <dd>No case is ticked, or the suite is empty. Tick at least one case, or click <b>＋ Add case</b>.</dd>
         <dt>Does it change anything on the site?</dt>
-        <dd>Some checks create, edit or delete products. Everything the robot creates is named <code>BTB …</code> and archived afterwards, so you may see these in the <b>Archived</b> tab. Just opening a page and checking it changes nothing.</dd>
+        <dd>Some checks create, edit or delete products. Everything the robot creates is named <code>BTB …</code> and archived afterwards, so you may see these in the <b>Archived</b> tab. Steps that say <i>Place order</i> create a real order for the customer <b>BTB Test</b>; the report gives its number. Just opening a page and checking it changes nothing.</dd>
         <dt>Which account does it use?</dt>
         <dd>The store owner account set up for SL QA. You don't need to log in yourself.</dd>
         <dt>A case failed, but the page looks fine to me</dt>
@@ -650,7 +703,22 @@ export function helpPage(): string {
       </ol>
       <p>That new run also shows a <b>Since the previous run</b> box at the top: ✅ <i>No longer failing: EX-4 (was Fail …)</i>. SL QA compares each case with its last result, so you can see at a glance what a fix changed.</p>
 
-      <h3>Step 5: Now write your own</h3>
+      <h3>Step 5: Paste a bug straight from Jira</h3>
+      <p>Most bugs are already written up in Jira. Here is one about the POS page, exactly as a tester wrote it:</p>
+      <pre class="jira">${esc(EXAMPLE_JIRA)}</pre>
+      <ol>
+        <li>In the example suite, click <b>＋ Add case</b>.</li>
+        <li>Copy the text above into <b>Paste a bug report</b> and click <b>Fill the form from it</b>. The page becomes <code>/dashboard/pos</code>, with 5 steps and 2 expected results.</li>
+        <li>Click <b>Add and check it now</b>.</li>
+      </ol>
+      <p>It comes back ${verdictBadge('Fail')} with two findings that read like this:</p>
+      <div class="finding-demo"><ul>
+        <li><b>Expected:</b> Names wrap up to 2 lines and stay readable<br><b>Actual:</b> 12 of 17 names are cut off (limited to 1 line), e.g. 'De'Amira Vacation Lashes - Pre-Glued' …</li>
+        <li><b>Expected:</b> An empty side panel can be collapsed or leaves room for the main content<br><b>Actual:</b> the right panel is 480px wide (33% of a 1440px screen) while empty; no collapse or hide control</li>
+      </ul></div>
+      <p>Nothing was rewritten: the bot read the steps and expected result as the tester wrote them, and measured the page. See <a href="#paste">Paste a bug report from Jira</a> for every kind of step and expected result it understands.</p>
+
+      <h3>Step 6: Now write your own</h3>
       <p>In the same suite, click <b>＋ Add case</b> and copy this pattern for a page you know:</p>
       <div class="pattern">
         <p><b>Title:</b> <span class="fill">What you're checking, in a few words</span></p>
@@ -774,7 +842,8 @@ pre { white-space:pre-wrap; font-size:12px; background:var(--bg); padding:10px; 
 .row-actions { white-space:nowrap; font-size:12.5px; } .row-actions form { display:inline; } button.link { border:0; background:none; padding:0 0 0 10px; color:var(--fail); font-size:12.5px; }
 .toolbar.bulk { margin:4px 0 10px; } label.check { display:flex; gap:8px; align-items:center; font-weight:400; }
 textarea { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); resize:vertical; }
-.issue-form { max-width:760px; } .issue-form .hint { font-weight:400; } .req { color:var(--fail); font-size:11px; font-weight:500; } .opt { color:var(--muted); font-size:11px; font-weight:400; }
+pre.jira { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:12.5px; max-width:100%; overflow-wrap:anywhere; }
+.issue-form { max-width:760px; } .issue-form details.paste { border:1px dashed var(--line); border-radius:8px; padding:10px 12px; background:var(--bg); } .issue-form details.paste summary { cursor:pointer; } .issue-form .hint { font-weight:400; } .req { color:var(--fail); font-size:11px; font-weight:500; } .opt { color:var(--muted); font-size:11px; font-weight:400; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } }
 a.button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
 .report { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 28px 24px; overflow-wrap:anywhere; }

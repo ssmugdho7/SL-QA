@@ -65,13 +65,16 @@ function parseCard([label = '', value = '', ...rest]: string[]): Card {
 export class Ui {
   constructor(readonly page: Page) {}
 
-  get main(): Locator { return this.page.locator('main'); }
+  /** The page's main area; pages without a <main> (POS) use the whole body. */
+  get main(): Locator { return this.page.locator('main, body:not(:has(main))').first(); }
 
   /** Opens a dashboard path. List pages are switched to List view so rows can be read. */
   async goto(path: string, opts: { waitForList?: boolean } = {}): Promise<void> {
     await this.page.goto(/^https?:/i.test(path) ? path : `${config.baseUrl}${path}`, { waitUntil: 'networkidle' }).catch(() => undefined);
     if (opts.waitForList === false) return;
-    await this.waitForList().catch(() => undefined);
+    // Pages without a list (POS, dashboard home) never show "Showing x–y of z"; don't wait long for it there.
+    const listPage = /\/dashboard\/(?:products|orders|customers|coupons|inventory)(?:[/?#]|$)/.test(path) && !/\/(?:detail|new|edit)\b/.test(path);
+    await this.waitForList(listPage ? 20_000 : 3_000).catch(() => undefined);
     await this.settle();
     await this.dismissOnboarding();
     await this.setView('list');

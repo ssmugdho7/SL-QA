@@ -3,11 +3,13 @@ import type { Session } from '../session.js';
 import type { TestCase } from '../sources/cases.js';
 import { healthProblems, inspectPage } from '../inspect.js';
 import { Missing } from '../ui.js';
-import { EXPECT_RULES, matchExpect } from './expects.js';
+import { EXPECT_RULES, type ExpectRule } from './expects.js';
+import { BEHAVIOUR_RULES } from './behaviour.js';
+import { ALL_STEP_RULES } from './natural.js';
 import { fallbackCheck, fallbackKind } from './fallback.js';
 import { applyFixtures, planFixtures } from './fixtures.js';
 import { expectClauses, stepClauses } from './split.js';
-import { STEP_RULES, type StepRule } from './steps.js';
+import type { StepRule } from './steps.js';
 
 /** How the engine reads one test case, without running it. Shown in the UI so testers can fix wording before a run. */
 export interface Preview {
@@ -15,6 +17,12 @@ export interface Preview {
   expects: { sentence: string; claims: { text: string; rule: string | null }[] }[];
   understood: number;
   total: number;
+}
+
+/** Exact sheet phrasings first, then the behaviour checks for plain-language expected results. */
+function expectRule(claim: string): ExpectRule | undefined {
+  const c = claim.trim();
+  return EXPECT_RULES.find((r) => r.pattern.test(c)) ?? BEHAVIOUR_RULES.find((r) => r.pattern.test(c));
 }
 
 function resolveClauses(sentence: string): { text: string; rule: StepRule | null }[] {
@@ -31,7 +39,7 @@ function resolveClauses(sentence: string): { text: string; rule: StepRule | null
       // "Click the 'All' tab, then 'Active'" → swap the quoted part; "Look at the header, the buttons" → "Look at the buttons".
       text = slot.test(lastVerb) && /^'[^']*'$|^\d+$|^(next|previous|last|first)$/i.test(own) ? lastVerb.replace(slot, own) : `${lastVerb.split(/\s+/).slice(0, /^(look|check|compare)\b/i.test(lastVerb) ? 2 : 1).join(' ')} ${own}`;
     }
-    const rule = STEP_RULES.find((r) => r.pattern.test(text)) ?? null;
+    const rule = ALL_STEP_RULES.find((r) => r.pattern.test(text)) ?? null;
     if (!c.continuation && rule) lastVerb = text;
     out.push({ text, rule });
   }
@@ -40,7 +48,7 @@ function resolveClauses(sentence: string): { text: string; rule: StepRule | null
 
 export function previewCase(tc: TestCase): Preview {
   const steps = tc.steps.map((s) => ({ sentence: s, clauses: resolveClauses(s).map((c) => ({ text: c.text, rule: c.rule?.name ?? null })) }));
-  const expects = tc.expected.map((e) => ({ sentence: e, claims: expectClauses(e).map((c) => ({ text: c, rule: matchExpect(c)?.name ?? fallbackKind(c) })) }));
+  const expects = tc.expected.map((e) => ({ sentence: e, claims: expectClauses(e).map((c) => ({ text: c, rule: expectRule(c)?.name ?? fallbackKind(c) })) }));
   const all = [...steps.flatMap((s) => s.clauses), ...expects.flatMap((e) => e.claims)];
   return { steps, expects, understood: all.filter((x) => x.rule).length, total: all.length };
 }
@@ -104,7 +112,7 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
 
     for (const sentence of tc.expected) {
       for (const claim of expectClauses(sentence)) {
-        const rule = EXPECT_RULES.find((r) => r.pattern.test(claim));
+        const rule = expectRule(claim);
         if (!rule) {
           if (!(await fallbackCheck(t, claim).catch(() => false))) t.skip(claim, `Not understood by the bot — compare with the page by hand.${pageGist(t)}`);
           continue;
