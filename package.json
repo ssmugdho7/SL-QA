@@ -1,0 +1,19 @@
+{
+  "name": "bug-triage-bot",
+  "version": "1.0.0",
+  "description": "Zero-AI QA runner: reads test cases from a Google Sheet, runs them against the live app with Playwright, writes a Markdown report.",
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "csv-parse": "^7.0.3",
+    "dotenv": "^18.0.8",
+    "playwright": "^1.64.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}
