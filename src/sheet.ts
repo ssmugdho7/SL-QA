@@ -17,9 +17,16 @@ const SHEET_COLUMNS = ['TC ID', 'Test Scenario', 'Test Case', 'Type', 'Priority'
 
 export async function loadTestCases(): Promise<TestCase[]> {
   const url = `https://docs.google.com/spreadsheets/d/${config.sheetId}/export?format=csv&gid=${config.sheetGid}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Could not download the sheet (HTTP ${res.status}). Is it shared as "anyone with the link"?`);
-  return parseSheet(await res.text());
+  // Google occasionally drops the first connection; retry a couple of times before giving up.
+  let res: Response | undefined;
+  for (let attempt = 1; attempt <= 3 && !res; attempt++) {
+    res = await fetch(url).catch((e) => {
+      if (attempt === 3) throw new Error(`Could not reach Google Sheets: ${e.message}`);
+      return undefined;
+    });
+  }
+  if (!res!.ok) throw new Error(`Could not download the sheet (HTTP ${res!.status}). Is it shared as "anyone with the link"?`);
+  return parseSheet(await res!.text());
 }
 
 export function parseSheet(csv: string): TestCase[] {
