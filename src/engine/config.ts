@@ -19,4 +19,11 @@ export const config = {
   dataDir: 'data',
   // Every record the bot creates carries this prefix so it is easy to spot and clean up.
   fixturePrefix: 'BTB',
+  /** Optional AI translator for sentences the rules do not understand. Leave both keys empty to stay zero-AI. */
+  ai: {
+    anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',
+    openaiKey: process.env.OPENAI_API_KEY ?? '',
+    /** Overrides the default model (claude-sonnet-5-5 / gpt-4.1-mini). */
+    model: process.env.AI_MODEL ?? '',
+  },
 };

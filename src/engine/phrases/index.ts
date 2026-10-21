@@ -7,6 +7,8 @@ import { EXPECT_RULES, type ExpectRule } from './expects.js';
 import { BEHAVIOUR_RULES } from './behaviour.js';
 import { FORM_EXPECT_RULES } from './form-expects.js';
 import { ALL_STEP_RULES } from './natural.js';
+import { ACTION_EXPECTS, ACTION_RULES } from './actions.js';
+import { approved, type Kind } from '../ai/translate.js';
 import { fallbackCheck, fallbackKind } from './fallback.js';
 import { applyFixtures, planFixtures } from './fixtures.js';
 import { expectClauses, stepClauses } from './split.js';
@@ -14,17 +16,29 @@ import type { StepRule } from './steps.js';
 
 /** How the engine reads one test case, without running it. Shown in the UI so testers can fix wording before a run. */
 export interface Preview {
-  steps: { sentence: string; clauses: { text: string; rule: string | null }[] }[];
-  expects: { sentence: string; claims: { text: string; rule: string | null }[] }[];
+  steps: { sentence: string; clauses: { text: string; rule: string | null; via?: 'ai' }[] }[];
+  expects: { sentence: string; claims: { text: string; rule: string | null; via?: 'ai' }[] }[];
   understood: number;
   total: number;
+  /** Sentences no rule and no approved rewrite understands; the AI translator can suggest rewrites for these. */
+  unknown: { kind: Kind; text: string }[];
+}
+
+/** An approved AI rewrite for a sentence: its lines and the rule each line maps to. Lines no rule reads are dropped. */
+function rewrite(kind: Kind, text: string): { lines: { text: string; step?: StepRule; expect?: ExpectRule }[]; note: string } | null {
+  const a = approved(kind, text);
+  if (!a) return null;
+  const lines = a.lines.map((l) => ({ text: l, step: ACTION_RULES.find((r) => r.pattern.test(l)), expect: ACTION_EXPECTS.find((r) => r.pattern.test(l)) }));
+  return { lines: lines.filter((l) => l.step || l.expect), note: a.note };
 }
 
 /** Exact sheet phrasings first, then the behaviour checks for plain-language expected results. */
 function expectRule(claim: string, form = false): ExpectRule | undefined {
   const c = claim.trim();
   // On the product form, its own checks come first ("Options should be: …" means the dropdown, not the sort menu).
-  return (form ? FORM_EXPECT_RULES.find((r) => r.pattern.test(c)) : undefined) ?? EXPECT_RULES.find((r) => r.pattern.test(c)) ?? BEHAVIOUR_RULES.find((r) => r.pattern.test(c));
+  // EXPECT … lines (upper-case, as the action language writes them) are exact checks; everything else uses the rules.
+  if (/^EXPECT\b/.test(c)) return ACTION_EXPECTS.find((r) => r.pattern.test(c));
+  return (form ? FORM_EXPECT_RULES.find((r) => r.pattern.test(c)) : undefined) ?? EXPECT_RULES.find((r) => r.pattern.test(c)) ?? BEHAVIOUR_RULES.find((r) => r.pattern.test(c)) ?? ACTION_EXPECTS.find((r) => r.pattern.test(c));
 }
 
 /** A case is about the product form when one of its steps opens it (Add Product / Edit / Save Product). */
@@ -32,11 +46,15 @@ export function aboutProductForm(tc: TestCase): boolean {
   return /'add product'|add product button|'save product'|click 'edit' on|edit page|^edit a (?:variable |simple )?product|products\/(?:new|.*edit)/im.test([...tc.steps, tc.url].join('\n'));
 }
 
-function resolveClauses(sentence: string, form = false): { text: string; rule: StepRule | null }[] {
-  const out: { text: string; rule: StepRule | null }[] = [];
-  const rules = form ? ALL_STEP_RULES : ALL_STEP_RULES.filter((r) => !r.formOnly);
+function resolveClauses(sentence: string, form = false): { text: string; rule: StepRule | null; via?: 'ai' }[] {
+  const out: { text: string; rule: StepRule | null; via?: 'ai' }[] = [];
+  // Specific rules know the app (fixtures, waits, confirmations); the generic actions come after them.
+  const rules = [...(form ? ALL_STEP_RULES : ALL_STEP_RULES.filter((r) => !r.formOnly)), ...ACTION_RULES];
   // On the product form, a whole sentence a form rule understands ("Enter each invalid value … in A, B and C") stays one step.
   const whole = sentence.trim().replace(/\.$/, '');
+  // A sentence written in the action language (an AI rewrite or typed that way) is one action as written.
+  const exact = ACTION_RULES.find((r) => r.pattern.test(whole));
+  if (exact && /^(GO TO|CLICK|DOUBLE CLICK|TYPE|ENTER|FILL|CLEAR|SELECT|CHOOSE|PICK|TURN (ON|OFF)|CHECK|UNCHECK|TICK|UNTICK|PRESS|WAIT|UPLOAD)\b/.test(whole) && !rules.slice(0, -ACTION_RULES.length).some((r) => r.pattern.test(whole))) return [{ text: whole, rule: exact }];
   if (form) {
     const rule = rules.find((r) => r.formOnly && r.pattern.test(whole));
     if (rule) return [{ text: whole, rule }];
@@ -62,15 +80,49 @@ function resolveClauses(sentence: string, form = false): { text: string; rule: S
     if (!c.continuation && rule) lastVerb = text;
     out.push({ text, rule });
   }
+  // Pieces no rule reads: use an approved rewrite of the whole sentence, else of the piece itself.
+  if (out.some((c) => !c.rule)) {
+    const all = rewrite('step', whole);
+    if (all?.lines.length) return all.lines.filter((l) => l.step).map((l) => ({ text: l.text, rule: l.step!, via: 'ai' as const }));
+    if (all && !all.lines.length) return [{ text: whole, rule: SKIPPED(all.note), via: 'ai' }];
+    return out.flatMap((c) => {
+      if (c.rule) return [c];
+      const r = rewrite('step', c.text);
+      if (!r) return [c];
+      if (!r.lines.length) return [{ text: c.text, rule: SKIPPED(r.note), via: 'ai' as const }];
+      return r.lines.filter((l) => l.step).map((l) => ({ text: l.text, rule: l.step!, via: 'ai' as const }));
+    });
+  }
   return out;
+}
+
+/** A reviewed "cannot be automated" answer: the step is noted, not failed. */
+function SKIPPED(note: string): StepRule {
+  return { name: 'not automated (reviewed)', pattern: /[\s\S]*/, run: async (t) => { t.note(note || 'Marked as not automatable when the AI suggestion was reviewed.'); return note || 'Not automated.'; } };
 }
 
 export function previewCase(tc: TestCase): Preview {
   const form = aboutProductForm(tc);
-  const steps = tc.steps.map((s) => ({ sentence: s, clauses: resolveClauses(s, form).map((c) => ({ text: c.text, rule: c.rule?.name ?? null })) }));
-  const expects = tc.expected.map((e) => ({ sentence: e, claims: expectClauses(e).map((c) => ({ text: c, rule: expectRule(c, form)?.name ?? fallbackKind(c) })) }));
+  const steps = tc.steps.map((s) => ({ sentence: s, clauses: resolveClauses(s, form).map((c) => ({ text: c.text, rule: c.rule?.name ?? null, via: c.via })) }));
+  const expects = tc.expected.map((e) => ({ sentence: e, claims: resolveClaims(e, form).map((c) => ({ text: c.text, rule: c.rule, via: c.via })) }));
   const all = [...steps.flatMap((s) => s.clauses), ...expects.flatMap((e) => e.claims)];
-  return { steps, expects, understood: all.filter((x) => x.rule).length, total: all.length };
+  const unknown = [
+    ...steps.filter((s) => s.clauses.some((c) => !c.rule)).map((s) => ({ kind: 'step' as const, text: s.sentence.trim().replace(/\.$/, '') })),
+    ...expects.flatMap((e) => e.claims.filter((c) => !c.rule).map((c) => ({ kind: 'expect' as const, text: c.text }))),
+  ];
+  return { steps, expects, understood: all.filter((x) => x.rule).length, total: all.length, unknown };
+}
+
+/** Expected-result claims with their check: a rule, the page fallback, or an approved rewrite into EXPECT lines. */
+function resolveClaims(sentence: string, form: boolean): { text: string; rule: string | null; check?: ExpectRule; via?: 'ai'; reviewedNote?: string }[] {
+  return expectClauses(sentence).flatMap((c) => {
+    const rule = expectRule(c, form);
+    if (rule) return [{ text: c, rule: rule.name, check: rule }];
+    const r = rewrite('expect', c);
+    if (r?.lines.length) return r.lines.filter((l) => l.expect).map((l) => ({ text: l.text, rule: l.expect!.name, check: l.expect, via: 'ai' as const }));
+    if (r) return [{ text: c, rule: 'not automated (reviewed)', via: 'ai' as const, reviewedNote: r.note }];
+    return [{ text: c, rule: fallbackKind(c) }];
+  });
 }
 
 /** Runs one test case: prepare data → run each step (snapshot after each) → check each expected result. */
@@ -107,7 +159,7 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
         }
         try {
           const detail = await rule.run(t, clause.text.match(rule.pattern)!, clause.text);
-          t.steps.push({ text: clause.text, status: 'done', detail: detail || undefined });
+          t.steps.push({ text: clause.via === 'ai' ? `${clause.text} (AI rewrite, approved)` : clause.text, status: 'done', detail: detail || undefined });
         } catch (e) {
           if (e instanceof Blocked) {
             t.steps.push({ text: clause.text, status: 'skipped', detail: e.message });
@@ -131,8 +183,13 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
     await t.shot('end');
 
     for (const sentence of tc.expected) {
-      for (const claim of expectClauses(sentence)) {
-        const rule = expectRule(claim, aboutProductForm(tc));
+      for (const resolved of resolveClaims(sentence, aboutProductForm(tc))) {
+        const claim = resolved.text;
+        const rule = resolved.check;
+        if (resolved.reviewedNote !== undefined) {
+          t.skip(claim, resolved.reviewedNote || 'Marked as not automatable when the AI suggestion was reviewed; check it by hand.');
+          continue;
+        }
         if (!rule) {
           if (!(await fallbackCheck(t, claim).catch(() => false))) t.skip(claim, `Not understood by the bot — compare with the page by hand.${pageGist(t)}`);
           continue;

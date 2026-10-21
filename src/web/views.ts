@@ -2,6 +2,7 @@ import type { CaseResult, Check, Verdict } from '../engine/context.js';
 import { previewCase } from '../engine/phrases/index.js';
 import type { TestCase } from '../engine/sources/cases.js';
 import { EXAMPLE_CASES, EXAMPLE_JIRA } from './example.js';
+import type { Translation } from '../engine/ai/translate.js';
 import type { Run, Suite } from './store.js';
 
 export const esc = (s: unknown) =>
@@ -145,7 +146,7 @@ function coverage(understood: number, total: number): string {
 
 // ── Suite: cases, preview, run ─────────────────────────────────────────
 
-export function suitePage(s: Suite, recent: Run[], flash?: string): string {
+export function suitePage(s: Suite, recent: Run[], flash?: string, ai?: { unknown: number; pending: number; provider: { name: string; model: string } | null }): string {
   const scenarios = [...new Set(s.cases.map((c) => c.scenario).filter(Boolean))];
   const rows = s.cases
     .map((c) => {
@@ -173,6 +174,7 @@ export function suitePage(s: Suite, recent: Run[], flash?: string): string {
     <div class="page-head"><div><h1>${esc(s.name)}</h1>
       <p class="sub">${[source, `starts on <code>${esc(s.pagePath)}</code>`, plural(n, 'case'), s.source.kind === 'sheet' ? `read ${when(s.syncedAt)}` : ''].filter(Boolean).join(' · ')}</p></div></div>
     ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
+    ${ai ? rewriteBanner(s, ai.unknown, ai.pending, ai.provider) : ''}
     ${n ? `<div class="toolbar">
       <form id="run" method="post" action="/suites/${s.id}/run" class="inline">
         <button class="primary" id="run-btn">▶ Run selected</button>
@@ -239,11 +241,76 @@ export function suitePage(s: Suite, recent: Run[], flash?: string): string {
 
 function previewHtml(c: TestCase): string {
   const p = previewCase(c);
-  const item = (text: string, rule: string | null) =>
-    `<li class="${rule ? 'ok' : 'warn'}">${rule ? '✓' : '?'} ${esc(text)}${rule ? ` <span class="rule">${esc(rule)}</span>` : ' <span class="rule">not understood: reword it (<a href="/help#writing">tips</a>)</span>'}</li>`;
-  return `<div class="preview"><b>Steps</b><ol>${p.steps.map((s) => `<li>${esc(s.sentence)}<ul>${s.clauses.map((x) => item(x.text, x.rule)).join('')}</ul></li>`).join('')}</ol>
-    <b>Expected</b><ul>${p.expects.map((e) => e.claims.map((x) => item(x.text, x.rule)).join('')).join('')}</ul></div>`;
+  const item = (text: string, rule: string | null, via?: 'ai') =>
+    `<li class="${rule ? 'ok' : 'warn'}">${rule ? '✓' : '?'} ${esc(text)}${rule ? ` <span class="rule">${esc(rule)}${via ? ' · <span class="tag ai">AI rewrite, approved</span>' : ''}</span>` : ' <span class="rule">not understood: reword it (<a href="/help#writing">tips</a>) or let the AI suggest a rewrite</span>'}</li>`;
+  return `<div class="preview"><b>Steps</b><ol>${p.steps.map((s) => `<li>${esc(s.sentence)}<ul>${s.clauses.map((x) => item(x.text, x.rule, x.via)).join('')}</ul></li>`).join('')}</ol>
+    <b>Expected</b><ul>${p.expects.map((e) => e.claims.map((x) => item(x.text, x.rule, x.via)).join('')).join('')}</ul></div>`;
 }
+
+// ── AI rewrites: suggest, review, approve ─────────────────────────────
+
+export interface RewriteRow { key: string; t: Translation; cases: string[] }
+
+/** Banner on the suite page: how many sentences are not understood, and what to do about it. */
+export function rewriteBanner(s: Suite, unknownCount: number, pending: number, provider: { name: string; model: string } | null): string {
+  if (!unknownCount && !pending) return '';
+  const action = provider
+    ? `<form method="post" action="/suites/${s.id}/rewrites/suggest" class="inline"><button class="primary">✨ Ask AI to suggest rewrites</button></form>`
+    : '<span class="sub">To get AI suggestions, add an <code>ANTHROPIC_API_KEY</code> (or <code>OPENAI_API_KEY</code>) to <code>.env</code> and restart. See <a href="/help#ai">How to use → AI rewrites</a>.</span>';
+  return `<div class="card ai-banner"><div><b>${plural(unknownCount, 'sentence')} the bot does not understand yet.</b>
+    ${pending ? `${plural(pending, 'AI suggestion')} waiting for review.` : ''}
+    <div class="sub">The AI only rewrites them into simple steps (CLICK, TYPE, EXPECT TEXT…). Nothing it writes runs until you approve it, and approved rewrites are reused, so each sentence needs the AI only once.${provider ? ` Using ${esc(provider.name)} · ${esc(provider.model)}.` : ''}</div></div>
+    <div class="toolbar">${action}${pending || unknownCount ? `<a class="button" href="/suites/${s.id}/rewrites">Review rewrites${pending ? ` (${pending})` : ''}</a>` : ''}</div></div>`;
+}
+
+export function rewritesPage(s: Suite, rows: RewriteRow[], unknown: { kind: string; text: string; cases: string[] }[], provider: { name: string; model: string } | null, flash?: string): string {
+  const status = (t: Translation) => (t.status === 'approved' ? '<span class="ok">✓ approved</span>' : t.status === 'rejected' ? '<span class="sub">rejected</span>' : '<span class="warn">waiting for review</span>');
+  const card = ({ key, t, cases }: RewriteRow) => `<form method="post" action="/suites/${s.id}/rewrites" class="card rewrite stack">
+      <input type="hidden" name="key" value="${esc(key)}">
+      <div class="rewrite-head"><span class="tag">${t.kind === 'step' ? 'Step' : 'Expected'}</span> ${status(t)} <span class="sub">used in ${esc(cases.join(', ') || '—')}</span></div>
+      <p class="source">“${esc(t.source)}”</p>
+      <label><span>Rewrite <span class="sub">one action per line; edit freely</span></span>
+        <textarea name="lines" rows="${Math.max(2, t.lines.length + 1)}" spellcheck="false">${esc(t.lines.join('\n'))}</textarea></label>
+      ${t.note ? `<p class="sub">AI note: ${esc(t.note)}</p>` : ''}
+      ${!t.lines.length ? '<p class="sub">No lines: approving marks this sentence as “cannot be automated”; it is reported as not checked with the note above.</p>' : ''}
+      <div class="toolbar">
+        <button class="primary" name="action" value="approve">✓ Approve${t.status === 'approved' ? ' changes' : ''}</button>
+        <button name="action" value="reject">Reject</button>
+        ${t.status !== 'suggested' ? '<button name="action" value="reset" class="link">Back to review</button>' : ''}
+      </div></form>`;
+  const waiting = rows.filter((r) => r.t.status === 'suggested');
+  const done = rows.filter((r) => r.t.status !== 'suggested');
+  return layout(
+    'AI rewrites',
+    `<p class="crumbs"><a href="/">Suites</a> / <a href="/suites/${s.id}">${esc(s.name)}</a> /</p>
+    <h1>AI rewrites</h1>
+    <p class="sub">Sentences the bot did not understand, rewritten by AI into simple actions it can run. Check each one, edit it if needed, then approve. Approved rewrites are saved and reused by every suite.</p>
+    ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
+    <div class="toolbar">
+      ${provider ? `<form method="post" action="/suites/${s.id}/rewrites/suggest" class="inline"><button class="primary"${unknown.length ? '' : ' disabled'}>✨ Suggest rewrites for ${plural(unknown.length, 'sentence')}</button></form>` : '<span class="warn">No AI key set. Add <code>ANTHROPIC_API_KEY</code> or <code>OPENAI_API_KEY</code> to <code>.env</code> and restart.</span>'}
+      ${waiting.length ? `<form method="post" action="/suites/${s.id}/rewrites" class="inline" onsubmit="return confirm(${jsq(`Approve all ${waiting.length} suggestions without editing?`)})"><input type="hidden" name="action" value="approve-all"><button>Approve all ${waiting.length}</button></form>` : ''}
+      <a class="button" href="/suites/${s.id}">Back to suite</a>
+    </div>
+    ${unknown.length ? `<details class="card"><summary><b>${plural(unknown.length, 'sentence')} without a rewrite yet</b></summary><ul>${unknown.map((u) => `<li><span class="tag">${u.kind === 'step' ? 'Step' : 'Expected'}</span> ${esc(u.text)} <span class="sub">(${esc(u.cases.join(', '))})</span></li>`).join('')}</ul></details>` : ''}
+    ${waiting.length ? `<h2>Waiting for review (${waiting.length})</h2>${waiting.map(card).join('')}` : ''}
+    ${done.length ? `<h2>Reviewed (${done.length})</h2>${done.map(card).join('')}` : ''}
+    ${!rows.length && !unknown.length ? '<div class="empty"><b>Every sentence in this suite is understood.</b></div>' : ''}
+    <details class="card"><summary><b>The action language</b></summary>${ACTION_HELP}</details>`,
+    { section: 'suites' },
+  );
+}
+
+export const ACTION_HELP = `<table class="stack-sm"><thead><tr><th>Line</th><th>What the bot does</th></tr></thead><tbody>
+  <tr><td><code>GO TO '/dashboard/orders'</code></td><td>Opens that page.</td></tr>
+  <tr><td><code>CLICK 'Save Product'</code> · <code>CLICK 'Delete' IN 'Confirm'</code></td><td>Clicks the button, link, tab or text with that name (inside a dialog or section when given).</td></tr>
+  <tr><td><code>TYPE '100' INTO 'Selling Price'</code> · <code>CLEAR 'Search'</code></td><td>Types into the field with that label or placeholder.</td></tr>
+  <tr><td><code>SELECT 'kg' IN 'Unit'</code></td><td>Opens the dropdown and picks the option.</td></tr>
+  <tr><td><code>TURN ON 'Track inventory'</code> · <code>CHECK 'Select all'</code></td><td>Switches and checkboxes.</td></tr>
+  <tr><td><code>PRESS 'Enter'</code> · <code>WAIT 2</code> · <code>UPLOAD 'square jpg' TO 'Gallery'</code></td><td>Keys, pauses, and test files the bot makes itself.</td></tr>
+  <tr><td><code>EXPECT TEXT 'Product created'</code> · <code>EXPECT NO TEXT 'Error'</code></td><td>Text on the page or in a pop-up message.</td></tr>
+  <tr><td><code>EXPECT MESSAGE 'required'</code> · <code>EXPECT URL '/dashboard/products'</code></td><td>A pop-up message; the page address.</td></tr>
+  <tr><td><code>EXPECT BUTTON 'Save' DISABLED</code> · <code>EXPECT FIELD 'Price' = '100'</code> · <code>EXPECT COUNT 'Showing 1–1 of 1'</code></td><td>Button state, a field's value, a count.</td></tr>
+</tbody></table><p class="sub">You can also type these lines straight into a sheet or the Add case form; the bot understands them without AI.</p>`;
 
 // ── Runs ───────────────────────────────────────────────────────────────
 
@@ -461,7 +528,7 @@ export function helpPage(): string {
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
       <a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI rewrites for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -625,6 +692,28 @@ export function helpPage(): string {
       <p><b>Checked by hand, on purpose.</b> The bot never presses <b>Generate</b> in <i>Write with AI</i>, because each use is charged to the store wallet. It doesn't test two browser tabs editing the same product, or logging out mid-save. New products take a while to appear on the storefront, so storefront checks on a just-saved product are marked <b>not checked</b>, not failed.</p>
     </section>
 
+    <section id="ai"><h2>AI rewrites for anything else</h2>
+      <p>The bot has fixed rules for the pages it has been taught. On other pages, many sentences show <b>?</b> (not understood). For those, SL QA can ask an AI to <b>rewrite</b> each sentence into simple steps the bot already knows. You check every rewrite before anything runs.</p>
+      <ol>
+        <li>On a suite with sentences that aren't understood, a box says <i>"N sentences the bot does not understand yet"</i>. Click <b>✨ Ask AI to suggest rewrites</b>.</li>
+        <li>Open <b>Review rewrites</b>. Each card shows the original sentence and the AI's version, for example:<br>
+          <code>"Open the product's detail page from Quick view"</code> → <code>GO TO '/dashboard/products'</code> · <code>CLICK 'Quick view'</code> · <code>CLICK 'View full details'</code></li>
+        <li>Edit the lines if needed, then <b>Approve</b> (or <b>Reject</b>). An empty rewrite means "cannot be automated" (for example, it needs a barcode scanner). Approving it marks the sentence as <b>not checked</b> with that reason.</li>
+        <li>Run the suite. Approved rewrites show as <span class="tag ai">AI rewrite, approved</span> in <i>How the bot reads it</i> and in the report.</li>
+      </ol>
+      <div class="tip"><b>Why this is safe.</b> The AI only translates sentences. It never clicks anything and never decides whether a test passed; the bot's own checks do that. Nothing runs until you approve it. Approved rewrites are saved and reused by every suite, so each sentence needs the AI only once, and runs stay repeatable.</div>
+      <h3>The step language</h3>
+      ${ACTION_HELP}
+      <h3>Setting up the AI key</h3>
+      <p>Whoever runs SL QA adds <b>one</b> of these to the <code>.env</code> file and restarts it:</p>
+      <ul>
+        <li><code>ANTHROPIC_API_KEY=…</code>: Claude, from <b>console.anthropic.com → API keys</b> (recommended; the default model is Claude Sonnet).</li>
+        <li><code>OPENAI_API_KEY=…</code>: OpenAI, from <b>platform.openai.com → API keys</b>.</li>
+        <li>Optional: <code>AI_MODEL=…</code> chooses a cheaper or stronger model.</li>
+      </ul>
+      <p class="sub">Without a key, everything else works as before (no AI). The sentences, the case title and the page path are sent to the AI provider; logins and store data are not.</p>
+    </section>
+
     <section id="writing"><h2>Writing sentences the bot understands</h2>
       <p>Plain sentences like the ones in a Jira report work (see the tables <a href="#paste">above</a>). When you want to be exact, these habits help most:</p>
       <table class="stack-sm"><thead><tr><th>Do</th><th>Avoid</th></tr></thead><tbody>
@@ -632,6 +721,7 @@ export function helpPage(): string {
         <tr><td>Put exact button and text names <b>in single quotes</b> when the check is about that text:<br><code>The 'Add Product' button should be visible.</code></td><td><code>There should be a button to add products.</code></td></tr>
         <tr><td>Say what you would see: <code>An alert message should be shown</code>, <code>The total should not be ৳0.00</code></td><td><code>It should behave properly</code></td></tr>
         <tr><td><code>The page should load without errors.</code></td><td><code>Page works fine</code></td></tr>
+        <tr><td>Exact steps on any page: <code>CLICK 'Save Product'</code>, <code>TYPE '100' INTO 'Selling Price'</code>, <code>EXPECT TEXT 'Product created'</code> (see <a href="#ai">the step language</a>)</td><td>Vague steps on a page the bot was never taught</td></tr>
         <tr><td><code>The page should not show NaN or undefined values.</code></td><td><code>Numbers look right</code></td></tr>
         <tr><td><code>A logged-out user should be redirected to the login page.</code></td><td><code>Login is required</code></td></tr>
       </tbody></table>
@@ -860,6 +950,9 @@ pre { white-space:pre-wrap; font-size:12px; background:var(--bg); padding:10px; 
 .toolbar.bulk { margin:4px 0 10px; } label.check { display:flex; gap:8px; align-items:center; font-weight:400; }
 textarea { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); resize:vertical; }
 pre.jira { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:12.5px; max-width:100%; overflow-wrap:anywhere; }
+.ai-banner { display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; border-color:color-mix(in srgb, var(--link) 35%, var(--line)); }
+.rewrite { max-width:860px; } .rewrite .source { font-size:15px; margin:4px 0; } .rewrite textarea { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
+.rewrite-head { display:flex; gap:10px; align-items:center; flex-wrap:wrap; } .tag.ai { background:color-mix(in srgb, var(--link) 15%, transparent); }
 .issue-form { max-width:760px; } .issue-form details.paste { border:1px dashed var(--line); border-radius:8px; padding:10px 12px; background:var(--bg); } .issue-form details.paste summary { cursor:pointer; } .issue-form .hint { font-weight:400; } .req { color:var(--fail); font-size:11px; font-weight:500; } .opt { color:var(--muted); font-size:11px; font-weight:400; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } }
 a.button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }

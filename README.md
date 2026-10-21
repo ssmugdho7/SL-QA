@@ -43,6 +43,12 @@ Expected results it can judge by measuring the page: an input that should be blo
 
 Cases whose steps open the product form are read with form rules (`src/engine/phrases/form.ts`, checks in `form-expects.ts`, driver in `src/engine/apps/slshop/product-form.ts`). Field values come from the Test Data column (`Name: 'Test Soap'`, `Price 500, Cost 350`). Sections can use old names (`Pricing details`, `Photos`). Every product the bot saves is named `BTB <case>` and archived afterwards; inline-created categories, brands, labels and attribute values are removed. Test images are generated on the fly. *Write with AI* is never run (it charges the wallet); multi-tab conflicts and session expiry are reported as not checked.
 
+### AI rewrites (optional)
+
+Sentences no rule understands can be rewritten by an AI into a small step language (`GO TO`, `CLICK`, `TYPE … INTO`, `SELECT … IN`, `TURN ON/OFF`, `EXPECT TEXT`, `EXPECT BUTTON … ENABLED`, `EXPECT FIELD … =`, …; see `src/engine/phrases/actions.ts`). On a suite, **Ask AI to suggest rewrites** → **Review rewrites** → edit/approve. Only approved rewrites run; they are stored in `data/translations.json` and reused, so each sentence needs the AI once. The AI never clicks or decides verdicts.
+
+Set one key in `.env`: `ANTHROPIC_API_KEY` (Claude, recommended; default model `claude-sonnet-5-5`) or `OPENAI_API_KEY` (default `gpt-4.1-mini`); `AI_MODEL` overrides the model. With no key, SL QA stays zero-AI. Lines in the step language can also be typed straight into a sheet.
+
 ### Sheet format
 
 | Column | Required | Notes |

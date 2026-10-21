@@ -10,7 +10,12 @@ import { parseBugText } from '../engine/sources/bug-text.js';
 import { EXAMPLE_CASES, EXAMPLE_SUITE_NAME, exampleCsv } from './example.js';
 import { cancel, enqueue, recover } from './runner.js';
 import { newId, runs, suites, uploadsDir, type Run, type Suite } from './store.js';
-import { helpPage, homePage, issueFormPage, layout, notFound, reportPage, runPage, runsPage, SAMPLE_CSV, suitePage } from './views.js';
+import { helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow } from './views.js';
+import { previewCase } from '../engine/phrases/index.js';
+import { expectClauses, stepClauses } from '../engine/phrases/split.js';
+
+const stepPieces = (sentence: string) => stepClauses(sentence).map((c) => c.text);
+import { aiProvider, keyOf, loadTranslations, saveTranslations, setStatus, translate, type Kind } from '../engine/ai/translate.js';
 
 type Form = { fields: Record<string, string[]>; files: Record<string, { name: string; data: Buffer }> };
 
@@ -141,7 +146,61 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   if ((m = p.match(/^\/suites\/([\w-]+)$/)) && !post) {
     const s = suites.get(m[1]);
     if (!s) return send(res, 404, notFound('suite'));
-    return send(res, 200, suitePage(s, runs.forSuite(s.id), url.searchParams.get('msg') ?? undefined));
+    const { unknown, pending } = rewriteState(s);
+    return send(res, 200, suitePage(s, runs.forSuite(s.id), url.searchParams.get('msg') ?? undefined, { unknown: unknown.length, pending: pending.length, provider: aiProvider() }));
+  }
+
+  // AI rewrites for sentences the rules do not understand: list, suggest, review.
+  if ((m = p.match(/^\/suites\/([\w-]+)\/rewrites$/)) && !post) {
+    const s = suites.get(m[1]);
+    if (!s) return send(res, 404, notFound('suite'));
+    const { unknown, rows } = rewriteState(s);
+    return send(res, 200, rewritesPage(s, rows, unknown, aiProvider(), url.searchParams.get('msg') ?? undefined));
+  }
+
+  if ((m = p.match(/^\/suites\/([\w-]+)\/rewrites\/suggest$/)) && post) {
+    const s = suites.get(m[1]);
+    if (!s) return send(res, 404, notFound('suite'));
+    if (!aiProvider()) return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent('No AI key is set. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env and restart SL QA.')}`);
+    const { unknown } = rewriteState(s);
+    const all = loadTranslations();
+    let made = 0;
+    const errors: string[] = [];
+    // A handful at a time keeps the page responsive and the cost visible; press again for more.
+    for (const u of unknown.slice(0, 25)) {
+      const tc = s.cases.find((c) => c.id === u.cases[0])!;
+      try {
+        const t = await translate(u.kind as Kind, u.text, { page: tc.url || s.pagePath, title: tc.title, steps: tc.steps, expected: tc.expected });
+        if (t) {
+          all[keyOf(u.kind as Kind, u.text)] = t;
+          made++;
+        }
+      } catch (e) {
+        errors.push((e as Error).message);
+        if (/401|403|invalid.*key|authentication/i.test((e as Error).message)) break;
+      }
+    }
+    saveTranslations(all);
+    const more = unknown.length > 25 ? ` ${unknown.length - 25} more are left; press Suggest again.` : '';
+    const msg = errors.length ? `Made ${made} suggestion(s); ${errors.length} failed: ${errors[0].slice(0, 160)}` : `Made ${made} suggestion(s). Review them below.${more}`;
+    return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent(msg)}`);
+  }
+
+  if ((m = p.match(/^\/suites\/([\w-]+)\/rewrites$/)) && post) {
+    const s = suites.get(m[1]);
+    if (!s) return send(res, 404, notFound('suite'));
+    const form = await parseForm(req);
+    const action = field(form, 'action');
+    if (action === 'approve-all') {
+      const { pending } = rewriteState(s);
+      for (const r of pending) setStatus(r.key, 'approved');
+      return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent(`Approved ${pending.length} rewrite(s).`)}`);
+    }
+    const key = field(form, 'key');
+    const lines = (form.fields.lines?.[0] ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const status = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'suggested';
+    const t = setStatus(key, status, lines);
+    return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent(t ? `${status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Moved back to review'}: “${t.source.slice(0, 60)}”` : 'That rewrite no longer exists.')}`);
   }
 
   if ((m = p.match(/^\/suites\/([\w-]+)\/issues\/(new|[^/]+\/edit)$/)) && !post) {
@@ -309,6 +368,39 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   }
 
   return send(res, 404, notFound());
+}
+
+/** Sentences in a suite no rule understands, and the AI rewrites that exist for this suite's sentences. */
+function rewriteState(s: Suite): { unknown: { kind: string; text: string; cases: string[] }[]; rows: RewriteRow[]; pending: RewriteRow[] } {
+  const all = loadTranslations();
+  const unknownMap = new Map<string, { kind: string; text: string; cases: string[] }>();
+  const rowMap = new Map<string, RewriteRow>();
+  for (const c of s.cases) {
+    const p = previewCase(c);
+    // The original wording of every sentence and claim (a claim shown as its rewrite is looked up by its source).
+    const sentences = [
+      ...c.steps.map((x) => ({ kind: 'step' as const, text: x.trim().replace(/\.$/, '') })),
+      ...c.steps.flatMap((x) => stepPieces(x)).map((x) => ({ kind: 'step' as const, text: x })),
+      ...c.expected.flatMap((e) => expectClauses(e)).map((x) => ({ kind: 'expect' as const, text: x })),
+    ];
+    for (const u of [...p.unknown, ...sentences]) {
+      const key = keyOf(u.kind, u.text);
+      if (all[key]) {
+        const row = rowMap.get(key) ?? { key, t: all[key], cases: [] };
+        if (!row.cases.includes(c.id)) row.cases.push(c.id);
+        rowMap.set(key, row);
+      }
+    }
+    for (const u of p.unknown) {
+      const key = keyOf(u.kind, u.text);
+      if (all[key]) continue;
+      const e = unknownMap.get(key) ?? { kind: u.kind, text: u.text, cases: [] };
+      if (!e.cases.includes(c.id)) e.cases.push(c.id);
+      unknownMap.set(key, e);
+    }
+  }
+  const rows = [...rowMap.values()];
+  return { unknown: [...unknownMap.values()], rows, pending: rows.filter((r) => r.t.status === 'suggested') };
 }
 
 /** Builds a test case from the add/edit issue form, or returns what is missing. */
