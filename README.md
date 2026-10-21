@@ -47,7 +47,7 @@ Cases whose steps open the product form are read with form rules (`src/engine/ph
 
 Sentences no rule understands can be rewritten by an AI into a small step language (`GO TO`, `CLICK`, `TYPE … INTO`, `SELECT … IN`, `TURN ON/OFF`, `EXPECT TEXT`, `EXPECT BUTTON … ENABLED`, `EXPECT FIELD … =`, …; see `src/engine/phrases/actions.ts`). On a suite, **Ask AI to suggest rewrites** → **Review rewrites** → edit/approve. Only approved rewrites run; they are stored in `data/translations.json` and reused, so each sentence needs the AI once. The AI never clicks or decides verdicts.
 
-Set one key in `.env`: `ANTHROPIC_API_KEY` (Claude, recommended; default model `claude-sonnet-5-5`) or `OPENAI_API_KEY` (default `gpt-4.1-mini`); `AI_MODEL` overrides the model. With no key, SL QA stays zero-AI. Lines in the step language can also be typed straight into a sheet.
+**Keys: free first, paid as a capped backup** (`src/engine/ai/providers.ts`). SL QA tries every free provider that has a key, in order: `GEMINI_API_KEY` (Google AI Studio), `GROQ_API_KEY`, `OPENROUTER_API_KEY` (only `:free` models), `MISTRAL_API_KEY`. A provider that fails (bad key, quota used up, server error, unreadable answer) is skipped for a while and the next is tried. Paid keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `CEREBRAS_API_KEY`) are used only when every free one failed, at most `AI_PAID_DAILY_LIMIT` times a day (default 20; 0 = never). Models can be changed per provider (`GEMINI_MODEL`, `GROQ_MODEL`, …); several keys per provider can be comma-separated. Usage and cool-downs are kept in `data/ai-usage.json`; the **AI keys** page (`/settings/ai`) shows the status. With no key, SL QA stays zero-AI. Lines in the step language can also be typed straight into a sheet.
 
 ### Sheet format
 

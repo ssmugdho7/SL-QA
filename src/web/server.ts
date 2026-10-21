@@ -10,11 +10,12 @@ import { parseBugText } from '../engine/sources/bug-text.js';
 import { EXAMPLE_CASES, EXAMPLE_SUITE_NAME, exampleCsv } from './example.js';
 import { cancel, enqueue, recover } from './runner.js';
 import { newId, runs, suites, uploadsDir, type Run, type Suite } from './store.js';
-import { helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow } from './views.js';
+import { aiKeysPage, helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow } from './views.js';
 import { previewCase } from '../engine/phrases/index.js';
 import { expectClauses, stepClauses } from '../engine/phrases/split.js';
 
 const stepPieces = (sentence: string) => stepClauses(sentence).map((c) => c.text);
+import { status as aiStatus, resetCoolDowns, paidDailyLimit, usage as aiUsage } from '../engine/ai/providers.js';
 import { aiProvider, keyOf, loadTranslations, saveTranslations, setStatus, translate, type Kind } from '../engine/ai/translate.js';
 
 type Form = { fields: Record<string, string[]>; files: Record<string, { name: string; data: Buffer }> };
@@ -161,7 +162,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   if ((m = p.match(/^\/suites\/([\w-]+)\/rewrites\/suggest$/)) && post) {
     const s = suites.get(m[1]);
     if (!s) return send(res, 404, notFound('suite'));
-    if (!aiProvider()) return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent('No AI key is set. Add ANTHROPIC_API_KEY or OPENAI_API_KEY to .env and restart SL QA.')}`);
+    if (!aiProvider()) return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent('No AI key is set. Add a free key such as GEMINI_API_KEY or GROQ_API_KEY to .env and restart SL QA (see How to use → AI keys).')}`);
     const { unknown } = rewriteState(s);
     const all = loadTranslations();
     let made = 0;
@@ -177,7 +178,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
         }
       } catch (e) {
         errors.push((e as Error).message);
-        if (/401|403|invalid.*key|authentication/i.test((e as Error).message)) break;
+        // Every provider failed (bad keys, quotas, paid cap): later sentences would fail the same way.
+        if (/Every AI provider failed|No AI key/.test((e as Error).message)) break;
       }
     }
     saveTranslations(all);
@@ -298,6 +300,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     }
     suites.remove(s.id);
     return redirect(res, '/');
+  }
+
+  if (p === '/settings/ai' && !post) {
+    return send(res, 200, aiKeysPage(aiStatus(), { used: aiUsage().paidCalls, limit: paidDailyLimit() }, url.searchParams.get('msg') ?? undefined));
+  }
+
+  if (p === '/settings/ai/reset' && post) {
+    resetCoolDowns();
+    return redirect(res, `/settings/ai?msg=${encodeURIComponent('Skipped providers will be tried again on the next request.')}`);
   }
 
   if (p === '/favicon.ico') {

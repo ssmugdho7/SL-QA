@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { config } from '../config.js';
+import { complete, configured, paidDailyLimit, usage } from './providers.js';
 
 /**
  * Optional AI translator. It only rewrites a sentence the rule engine did not understand into the fixed action
@@ -57,10 +58,20 @@ export function setStatus(key: string, status: Translation['status'], lines?: st
   return all[key];
 }
 
-export function aiProvider(): { name: string; model: string } | null {
-  if (config.ai.anthropicKey) return { name: 'Anthropic Claude', model: config.ai.model || 'claude-sonnet-5-5' };
-  if (config.ai.openaiKey) return { name: 'OpenAI', model: config.ai.model || 'gpt-4.1-mini' };
-  return null;
+/** The first provider that will be tried, for display; null when no key is set (SL QA then stays zero-AI). */
+export function aiProvider(): { name: string; model: string; chain: string[]; paidLimit: number; paidUsed: number } | null {
+  const list = configured();
+  if (!list.length) return null;
+  const free = list.filter((x) => x.provider.tier === 'free');
+  const first = free[0] ?? list[0];
+  const u = usage();
+  return {
+    name: first.provider.name,
+    model: first.model,
+    chain: list.map((x) => `${x.provider.name}${x.keys > 1 ? ` ×${x.keys} keys` : ''}`),
+    paidLimit: paidDailyLimit(),
+    paidUsed: u.paidCalls,
+  };
 }
 
 const GUIDE = `You turn one sentence from a QA test case for an online-shop admin dashboard (slshop.cloud) into exact lines in a small action language. A browser robot runs the lines. You only translate; you never judge whether the app is right.
@@ -95,8 +106,7 @@ Rules:
 
 /** Asks the AI to translate one sentence. Returns null when no key is set. */
 export async function translate(kind: Kind, source: string, ctx: { page: string; title: string; steps: string[]; expected: string[] }): Promise<Translation | null> {
-  const provider = aiProvider();
-  if (!provider) return null;
+  if (!aiProvider()) return null;
   const user = `Page the case starts on: ${ctx.page || '(unknown)'}
 Case title: ${ctx.title}
 All steps of the case:
@@ -106,36 +116,14 @@ ${ctx.expected.map((e) => `- ${e}`).join('\n')}
 
 Translate this ${kind === 'step' ? 'STEP' : 'EXPECTED RESULT'} sentence into ${kind === 'step' ? 'STEP' : 'EXPECT'} lines:
 "${source}"`;
-  const text = provider.name.startsWith('Anthropic') ? await callAnthropic(provider.model, user) : await callOpenAI(provider.model, user);
-  const json = text.match(/\{[\s\S]*\}/)?.[0] ?? '{}';
-  let parsed: { lines?: unknown; note?: unknown } = {};
-  try {
-    parsed = JSON.parse(json);
-  } catch {
-    parsed = { lines: [], note: `The AI answer could not be read: ${text.slice(0, 120)}` };
-  }
-  const lines = (Array.isArray(parsed.lines) ? parsed.lines : []).map(String).map((l) => l.trim()).filter(Boolean).slice(0, 12);
-  return { source, kind, lines, note: String(parsed.note ?? ''), status: 'suggested', page: ctx.page, model: provider.model, createdAt: new Date().toISOString() };
-}
-
-async function callAnthropic(model: string, user: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'x-api-key': config.ai.anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-    body: JSON.stringify({ model, max_tokens: 600, temperature: 0, system: GUIDE, messages: [{ role: 'user', content: user }] }),
-  });
-  const body = (await res.json().catch(() => ({}))) as { content?: { type: string; text?: string }[]; error?: { message?: string } };
-  if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${body.error?.message ?? 'request failed'}`);
-  return (body.content ?? []).filter((c) => c.type === 'text').map((c) => c.text).join('');
-}
-
-async function callOpenAI(model: string, user: string): Promise<string> {
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { authorization: `Bearer ${config.ai.openaiKey}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model, temperature: 0, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: GUIDE }, { role: 'user', content: user }] }),
-  });
-  const body = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string } }[]; error?: { message?: string } };
-  if (!res.ok) throw new Error(`OpenAI API ${res.status}: ${body.error?.message ?? 'request failed'}`);
-  return body.choices?.[0]?.message?.content ?? '';
+  const parse = (text: string) => {
+    const json = text.match(/\{[\s\S]*\}/)?.[0];
+    if (!json) throw new Error('no JSON');
+    const parsed = JSON.parse(json) as { lines?: unknown; note?: unknown };
+    if (!Array.isArray(parsed.lines)) throw new Error('no lines');
+    return parsed;
+  };
+  const { value, provider: used, model } = await complete(GUIDE, user, parse);
+  const lines = (value.lines as unknown[]).map(String).map((l) => l.trim()).filter(Boolean).slice(0, 12);
+  return { source, kind, lines, note: String(value.note ?? ''), status: 'suggested', page: ctx.page, model: `${used.name} · ${model}`, createdAt: new Date().toISOString() };
 }

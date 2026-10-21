@@ -21,12 +21,12 @@ const duration = (a?: string, b?: string) => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-type Section = 'suites' | 'runs' | 'help';
+type Section = 'suites' | 'runs' | 'help' | 'ai';
 
 const FAVICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#d6243a"/><path d="M9 16.5l4.5 4.5L23 11.5" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>')}`;
 
 export function layout(title: string, body: string, opts: { refresh?: boolean; section?: Section } = {}): string {
-  const nav = ([['suites', '/', 'Suites'], ['runs', '/runs', 'Runs'], ['help', '/help', 'How to use']] as const)
+  const nav = ([['suites', '/', 'Suites'], ['runs', '/runs', 'Runs'], ['ai', '/settings/ai', 'AI keys'], ['help', '/help', 'How to use']] as const)
     .map(([key, href, label]) => `<a href="${href}"${opts.section === key ? ' aria-current="page"' : ''}>${label}</a>`)
     .join('');
   return `<!doctype html>
@@ -146,7 +146,7 @@ function coverage(understood: number, total: number): string {
 
 // ── Suite: cases, preview, run ─────────────────────────────────────────
 
-export function suitePage(s: Suite, recent: Run[], flash?: string, ai?: { unknown: number; pending: number; provider: { name: string; model: string } | null }): string {
+export function suitePage(s: Suite, recent: Run[], flash?: string, ai?: { unknown: number; pending: number; provider: AiInfo }): string {
   const scenarios = [...new Set(s.cases.map((c) => c.scenario).filter(Boolean))];
   const rows = s.cases
     .map((c) => {
@@ -252,18 +252,20 @@ function previewHtml(c: TestCase): string {
 export interface RewriteRow { key: string; t: Translation; cases: string[] }
 
 /** Banner on the suite page: how many sentences are not understood, and what to do about it. */
-export function rewriteBanner(s: Suite, unknownCount: number, pending: number, provider: { name: string; model: string } | null): string {
+type AiInfo = { name: string; model: string; chain: string[]; paidLimit: number; paidUsed: number } | null;
+
+export function rewriteBanner(s: Suite, unknownCount: number, pending: number, provider: AiInfo): string {
   if (!unknownCount && !pending) return '';
   const action = provider
     ? `<form method="post" action="/suites/${s.id}/rewrites/suggest" class="inline"><button class="primary">✨ Ask AI to suggest rewrites</button></form>`
-    : '<span class="sub">To get AI suggestions, add an <code>ANTHROPIC_API_KEY</code> (or <code>OPENAI_API_KEY</code>) to <code>.env</code> and restart. See <a href="/help#ai">How to use → AI rewrites</a>.</span>';
+    : '<span class="sub">To get AI suggestions, add a free key such as <code>GEMINI_API_KEY</code> or <code>GROQ_API_KEY</code> to <code>.env</code> and restart. See <a href="/help#ai-keys">How to use → AI keys</a>.</span>';
   return `<div class="card ai-banner"><div><b>${plural(unknownCount, 'sentence')} the bot does not understand yet.</b>
     ${pending ? `${plural(pending, 'AI suggestion')} waiting for review.` : ''}
-    <div class="sub">The AI only rewrites them into simple steps (CLICK, TYPE, EXPECT TEXT…). Nothing it writes runs until you approve it, and approved rewrites are reused, so each sentence needs the AI only once.${provider ? ` Using ${esc(provider.name)} · ${esc(provider.model)}.` : ''}</div></div>
+    <div class="sub">The AI only rewrites them into simple steps (CLICK, TYPE, EXPECT TEXT…). Nothing it writes runs until you approve it, and approved rewrites are reused, so each sentence needs the AI only once.${provider ? ` Tries, in order: ${esc(provider.chain.join(' → '))}. Paid calls today: ${provider.paidUsed} of ${provider.paidLimit}.` : ''}</div></div>
     <div class="toolbar">${action}${pending || unknownCount ? `<a class="button" href="/suites/${s.id}/rewrites">Review rewrites${pending ? ` (${pending})` : ''}</a>` : ''}</div></div>`;
 }
 
-export function rewritesPage(s: Suite, rows: RewriteRow[], unknown: { kind: string; text: string; cases: string[] }[], provider: { name: string; model: string } | null, flash?: string): string {
+export function rewritesPage(s: Suite, rows: RewriteRow[], unknown: { kind: string; text: string; cases: string[] }[], provider: AiInfo, flash?: string): string {
   const status = (t: Translation) => (t.status === 'approved' ? '<span class="ok">✓ approved</span>' : t.status === 'rejected' ? '<span class="sub">rejected</span>' : '<span class="warn">waiting for review</span>');
   const card = ({ key, t, cases }: RewriteRow) => `<form method="post" action="/suites/${s.id}/rewrites" class="card rewrite stack">
       <input type="hidden" name="key" value="${esc(key)}">
@@ -286,8 +288,9 @@ export function rewritesPage(s: Suite, rows: RewriteRow[], unknown: { kind: stri
     <h1>AI rewrites</h1>
     <p class="sub">Sentences the bot did not understand, rewritten by AI into simple actions it can run. Check each one, edit it if needed, then approve. Approved rewrites are saved and reused by every suite.</p>
     ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
+    ${provider ? `<p class="sub">AI providers, tried in this order: <b>${esc(provider.chain.join(' → '))}</b>. Paid calls today: ${provider.paidUsed} of ${provider.paidLimit} · <a href="/settings/ai">AI keys</a></p>` : ''}
     <div class="toolbar">
-      ${provider ? `<form method="post" action="/suites/${s.id}/rewrites/suggest" class="inline"><button class="primary"${unknown.length ? '' : ' disabled'}>✨ Suggest rewrites for ${plural(unknown.length, 'sentence')}</button></form>` : '<span class="warn">No AI key set. Add <code>ANTHROPIC_API_KEY</code> or <code>OPENAI_API_KEY</code> to <code>.env</code> and restart.</span>'}
+      ${provider ? `<form method="post" action="/suites/${s.id}/rewrites/suggest" class="inline"><button class="primary"${unknown.length ? '' : ' disabled'}>✨ Suggest rewrites for ${plural(unknown.length, 'sentence')}</button></form>` : '<span class="warn">No AI key set. Add a free key such as <code>GEMINI_API_KEY</code> or <code>GROQ_API_KEY</code> to <code>.env</code> and restart (<a href="/settings/ai">AI keys</a>).</span>'}
       ${waiting.length ? `<form method="post" action="/suites/${s.id}/rewrites" class="inline" onsubmit="return confirm(${jsq(`Approve all ${waiting.length} suggestions without editing?`)})"><input type="hidden" name="action" value="approve-all"><button>Approve all ${waiting.length}</button></form>` : ''}
       <a class="button" href="/suites/${s.id}">Back to suite</a>
     </div>
@@ -297,6 +300,28 @@ export function rewritesPage(s: Suite, rows: RewriteRow[], unknown: { kind: stri
     ${!rows.length && !unknown.length ? '<div class="empty"><b>Every sentence in this suite is understood.</b></div>' : ''}
     <details class="card"><summary><b>The action language</b></summary>${ACTION_HELP}</details>`,
     { section: 'suites' },
+  );
+}
+
+export function aiKeysPage(rows: ReturnType<typeof import('../engine/ai/providers.js').status>, paid: { used: number; limit: number }, flash?: string): string {
+  const row = (r: (typeof rows)[number]) => `<tr>
+    <td><b>${esc(r.provider.name)}</b><div class="sub">${r.provider.tier === 'free' ? 'free' : 'paid'}</div></td>
+    <td><code>${esc(r.provider.keyEnv)}</code>${r.keys > 1 ? `<div class="sub">${r.keys} keys</div>` : ''}</td>
+    <td>${r.set ? '<span class="ok">✓ set</span>' : '<span class="sub">not set</span>'}</td>
+    <td><code>${esc(r.model)}</code><div class="sub">change with <code>${esc(r.provider.modelEnv)}</code></div></td>
+    <td>${r.ok || r.failed ? `${r.ok} ok · ${r.failed} failed` : '<span class="sub">—</span>'}${r.coolingUntil ? `<div class="warn">skipped until ${esc(r.coolingUntil)} (${esc(r.coolReason ?? '')})</div>` : ''}${r.lastError ? `<div class="sub" title="${esc(r.lastError)}">last error: ${esc(r.lastError.slice(25, 120))}</div>` : ''}</td>
+    <td><a href="${esc(r.provider.signup)}" target="_blank" rel="noreferrer">Get a key ↗</a></td></tr>`;
+  return layout(
+    'AI keys',
+    `<p class="crumbs"><a href="/">Suites</a> /</p>
+    <h1>AI keys</h1>
+    <p class="sub">SL QA asks the AI only to rewrite sentences it does not understand. It tries the <b>free</b> providers first, top to bottom. A provider that fails (bad key, free quota used up, error) is skipped for a while and the next one is tried. <b>Paid</b> providers are used only when every free one failed, and at most <b>${paid.limit}</b> times a day.</p>
+    ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
+    <p>Paid calls today: <b>${paid.used} of ${paid.limit}</b> <span class="sub">(change with <code>AI_PAID_DAILY_LIMIT</code>; 0 = never use paid keys)</span></p>
+    ${wrap(`<table><thead><tr><th>Provider</th><th>.env name</th><th>Key</th><th>Model</th><th>Today</th><th></th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table>`)}
+    <form method="post" action="/settings/ai/reset" class="inline"><button>Try skipped providers again now</button></form>
+    <p class="sub">Keys are read from the <code>.env</code> file when SL QA starts; after changing it, restart SL QA. Several keys for one provider can be separated by commas. See <a href="/help#ai-keys">How to use → AI keys</a>.</p>`,
+    { section: 'ai' },
   );
 }
 
@@ -704,14 +729,24 @@ export function helpPage(): string {
       <div class="tip"><b>Why this is safe.</b> The AI only translates sentences. It never clicks anything and never decides whether a test passed; the bot's own checks do that. Nothing runs until you approve it. Approved rewrites are saved and reused by every suite, so each sentence needs the AI only once, and runs stay repeatable.</div>
       <h3>The step language</h3>
       ${ACTION_HELP}
-      <h3>Setting up the AI key</h3>
-      <p>Whoever runs SL QA adds <b>one</b> of these to the <code>.env</code> file and restarts it:</p>
+      <h3 id="ai-keys">AI keys: free first, paid only as a backup</h3>
+      <p>Put the keys in the <code>.env</code> file (next to <code>package.json</code>), then restart SL QA. The <a href="/settings/ai">AI keys</a> page shows which are set and how they are doing. SL QA tries the <b>free</b> providers in this order and moves on when one fails (bad key, free quota used up, server error):</p>
+      <table class="stack-sm"><thead><tr><th>Order</th><th>.env line</th><th>Where to get it</th><th>Free limits (roughly)</th></tr></thead><tbody>
+        <tr><td>1 · free</td><td><code>GEMINI_API_KEY=…</code></td><td>Google AI Studio → <b>Get API key</b> (aistudio.google.com/apikey)</td><td>~15 requests/min, ~500/day</td></tr>
+        <tr><td>2 · free</td><td><code>GROQ_API_KEY=…</code></td><td>console.groq.com → <b>API Keys</b></td><td>30/min, 1,000/day</td></tr>
+        <tr><td>3 · free</td><td><code>OPENROUTER_API_KEY=…</code></td><td>openrouter.ai → <b>Settings → Keys</b></td><td>20/min, 50/day (only ":free" models are used)</td></tr>
+        <tr><td>4 · free</td><td><code>MISTRAL_API_KEY=…</code></td><td>console.mistral.ai → <b>API Keys</b></td><td>monthly cap, shown in their console</td></tr>
+        <tr><td>5 · paid</td><td><code>ANTHROPIC_API_KEY=…</code></td><td>console.anthropic.com → <b>API Keys</b> (needs billing)</td><td>pay per use</td></tr>
+        <tr><td>6 · paid</td><td><code>OPENAI_API_KEY=…</code></td><td>platform.openai.com → <b>API keys</b> (needs billing)</td><td>pay per use</td></tr>
+        <tr><td>7 · paid</td><td><code>CEREBRAS_API_KEY=…</code></td><td>cloud.cerebras.ai (one-time $5 trial, card needed)</td><td>pay per use</td></tr>
+      </tbody></table>
       <ul>
-        <li><code>ANTHROPIC_API_KEY=…</code>: Claude, from <b>console.anthropic.com → API keys</b> (recommended; the default model is Claude Sonnet).</li>
-        <li><code>OPENAI_API_KEY=…</code>: OpenAI, from <b>platform.openai.com → API keys</b>.</li>
-        <li>Optional: <code>AI_MODEL=…</code> chooses a cheaper or stronger model.</li>
+        <li><b>You need only one free key to start.</b> Gemini and Groq are the easiest; adding two or three makes it very unlikely all free ones fail at once.</li>
+        <li><b>Paid keys are a backup.</b> They are used only after every free key failed, and at most <code>AI_PAID_DAILY_LIMIT</code> times a day (default 20; set 0 to never use them).</li>
+        <li><b>Change a model:</b> <code>GEMINI_MODEL</code>, <code>GROQ_MODEL</code>, <code>OPENROUTER_MODEL</code>, <code>MISTRAL_MODEL</code>, <code>ANTHROPIC_MODEL</code>, <code>OPENAI_MODEL</code>, <code>CEREBRAS_MODEL</code>.</li>
+        <li><b>Several keys for one provider:</b> separate them with commas. Note that Gemini limits are per Google Cloud project, so two keys from the same project don't add more.</li>
       </ul>
-      <p class="sub">Without a key, everything else works as before (no AI). The sentences, the case title and the page path are sent to the AI provider; logins and store data are not.</p>
+      <p class="sub">Without any key, everything else works as before (no AI). The sentences, the case title and the page path are sent to the provider; logins and store data are not. Free tiers may use prompts to improve their models (Google, and Mistral unless you opt out in its Admin → Privacy).</p>
     </section>
 
     <section id="writing"><h2>Writing sentences the bot understands</h2>
