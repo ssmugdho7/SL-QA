@@ -39,6 +39,10 @@ Plain steps it follows include: *Go to https://slshop.cloud/dashboard*, *Navigat
 
 Expected results it can judge by measuring the page: an input that should be blocked above the total, an alert or error that should appear, a total that should stay above ৳0, names that should wrap instead of being cut off, a side panel that should collapse or leave room, variable products that should show a price range instead of ৳0.00, and #1/#2 labels that should follow their cards after sorting. Each check reports the numbers it saw.
 
+### Add / Edit Product form
+
+Cases whose steps open the product form are read with form rules (`src/engine/phrases/form.ts`, checks in `form-expects.ts`, driver in `src/engine/apps/slshop/product-form.ts`). Field values come from the Test Data column (`Name: 'Test Soap'`, `Price 500, Cost 350`). Sections can use old names (`Pricing details`, `Photos`). Every product the bot saves is named `BTB <case>` and archived afterwards; inline-created categories, brands, labels and attribute values are removed. Test images are generated on the fly. *Write with AI* is never run (it charges the wallet); multi-tab conflicts and session expiry are reported as not checked.
+
 ### Sheet format
 
 | Column | Required | Notes |

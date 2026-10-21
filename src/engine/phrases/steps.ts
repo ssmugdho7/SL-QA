@@ -16,6 +16,8 @@ import { lc, quoted } from './text.js';
 export interface StepRule {
   name: string;
   pattern: RegExp;
+  /** Only for cases about the Add/Edit Product form (see onProductForm); other cases skip this rule. */
+  formOnly?: boolean;
   run: (t: CaseContext, m: RegExpMatchArray, clause: string) => Promise<void | string>;
 }
 
@@ -561,8 +563,10 @@ export const STEP_RULES: StepRule[] = [
     name: 'click done',
     pattern: /^click done$/i,
     run: async (t) => {
+      const before = await t.ui.showingText();
       await t.ui.dialog().getByRole('button', { name: 'Done' }).click();
       await t.ui.settle();
+      await t.ui.waitForListChange(before);
     },
   },
 

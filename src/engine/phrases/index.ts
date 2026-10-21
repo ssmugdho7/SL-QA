@@ -5,6 +5,7 @@ import { healthProblems, inspectPage } from '../inspect.js';
 import { Missing } from '../ui.js';
 import { EXPECT_RULES, type ExpectRule } from './expects.js';
 import { BEHAVIOUR_RULES } from './behaviour.js';
+import { FORM_EXPECT_RULES } from './form-expects.js';
 import { ALL_STEP_RULES } from './natural.js';
 import { fallbackCheck, fallbackKind } from './fallback.js';
 import { applyFixtures, planFixtures } from './fixtures.js';
@@ -20,13 +21,31 @@ export interface Preview {
 }
 
 /** Exact sheet phrasings first, then the behaviour checks for plain-language expected results. */
-function expectRule(claim: string): ExpectRule | undefined {
+function expectRule(claim: string, form = false): ExpectRule | undefined {
   const c = claim.trim();
-  return EXPECT_RULES.find((r) => r.pattern.test(c)) ?? BEHAVIOUR_RULES.find((r) => r.pattern.test(c));
+  // On the product form, its own checks come first ("Options should be: …" means the dropdown, not the sort menu).
+  return (form ? FORM_EXPECT_RULES.find((r) => r.pattern.test(c)) : undefined) ?? EXPECT_RULES.find((r) => r.pattern.test(c)) ?? BEHAVIOUR_RULES.find((r) => r.pattern.test(c));
 }
 
-function resolveClauses(sentence: string): { text: string; rule: StepRule | null }[] {
+/** A case is about the product form when one of its steps opens it (Add Product / Edit / Save Product). */
+export function aboutProductForm(tc: TestCase): boolean {
+  return /'add product'|add product button|'save product'|click 'edit' on|edit page|^edit a (?:variable |simple )?product|products\/(?:new|.*edit)/im.test([...tc.steps, tc.url].join('\n'));
+}
+
+function resolveClauses(sentence: string, form = false): { text: string; rule: StepRule | null }[] {
   const out: { text: string; rule: StepRule | null }[] = [];
+  const rules = form ? ALL_STEP_RULES : ALL_STEP_RULES.filter((r) => !r.formOnly);
+  // On the product form, a whole sentence a form rule understands ("Enter each invalid value … in A, B and C") stays one step.
+  const whole = sentence.trim().replace(/\.$/, '');
+  if (form) {
+    const rule = rules.find((r) => r.formOnly && r.pattern.test(whole));
+    if (rule) return [{ text: whole, rule }];
+    // "Go back to the Products page and search for the product" is one look-up of what was saved.
+    if (/^go back to the products page and search for the product$/i.test(whole)) {
+      const find = rules.find((r) => r.name === 'form: find saved product in the list');
+      if (find) return [{ text: whole, rule: find }];
+    }
+  }
   let lastVerb = '';
   for (const c of stepClauses(sentence)) {
     // "Click the 'All' tab, then 'Active'" → "Click the 'Active' tab": reuse the previous action's wording.
@@ -39,7 +58,7 @@ function resolveClauses(sentence: string): { text: string; rule: StepRule | null
       // "Click the 'All' tab, then 'Active'" → swap the quoted part; "Look at the header, the buttons" → "Look at the buttons".
       text = slot.test(lastVerb) && /^'[^']*'$|^\d+$|^(next|previous|last|first)$/i.test(own) ? lastVerb.replace(slot, own) : `${lastVerb.split(/\s+/).slice(0, /^(look|check|compare)\b/i.test(lastVerb) ? 2 : 1).join(' ')} ${own}`;
     }
-    const rule = ALL_STEP_RULES.find((r) => r.pattern.test(text)) ?? null;
+    const rule = rules.find((r) => r.pattern.test(text)) ?? null;
     if (!c.continuation && rule) lastVerb = text;
     out.push({ text, rule });
   }
@@ -47,8 +66,9 @@ function resolveClauses(sentence: string): { text: string; rule: StepRule | null
 }
 
 export function previewCase(tc: TestCase): Preview {
-  const steps = tc.steps.map((s) => ({ sentence: s, clauses: resolveClauses(s).map((c) => ({ text: c.text, rule: c.rule?.name ?? null })) }));
-  const expects = tc.expected.map((e) => ({ sentence: e, claims: expectClauses(e).map((c) => ({ text: c, rule: expectRule(c)?.name ?? fallbackKind(c) })) }));
+  const form = aboutProductForm(tc);
+  const steps = tc.steps.map((s) => ({ sentence: s, clauses: resolveClauses(s, form).map((c) => ({ text: c.text, rule: c.rule?.name ?? null })) }));
+  const expects = tc.expected.map((e) => ({ sentence: e, claims: expectClauses(e).map((c) => ({ text: c, rule: expectRule(c, form)?.name ?? fallbackKind(c) })) }));
   const all = [...steps.flatMap((s) => s.clauses), ...expects.flatMap((e) => e.claims)];
   return { steps, expects, understood: all.filter((x) => x.rule).length, total: all.length };
 }
@@ -73,7 +93,7 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
     await t.ui.goto(startPath);
     await t.snap('start', 'initial');
 
-    const clauses = tc.steps.flatMap((sentence) => resolveClauses(sentence));
+    const clauses = tc.steps.flatMap((sentence) => resolveClauses(sentence, aboutProductForm(tc)));
     for (const [i, clause] of clauses.entries()) {
       {
         onStep?.(clause.text);
@@ -112,7 +132,7 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
 
     for (const sentence of tc.expected) {
       for (const claim of expectClauses(sentence)) {
-        const rule = expectRule(claim);
+        const rule = expectRule(claim, aboutProductForm(tc));
         if (!rule) {
           if (!(await fallbackCheck(t, claim).catch(() => false))) t.skip(claim, `Not understood by the bot — compare with the page by hand.${pageGist(t)}`);
           continue;

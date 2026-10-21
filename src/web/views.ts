@@ -461,7 +461,7 @@ export function helpPage(): string {
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
       <a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -606,6 +606,23 @@ export function helpPage(): string {
       </tbody></table>
       <p>Open <b>How the bot reads it</b> under a case to see which rule each sentence got. A <b>?</b> means it wasn't understood: that sentence is skipped and the report says so. Every check in the report shows the numbers it measured, so you can judge it yourself.</p>
       <div class="tip"><b>Heads-up:</b> a step like <i>Click the Place order button</i> really places an order on the test store, for the customer <b>BTB Test</b>. The report gives the order number. The cart is emptied when the case ends.</div>
+    </section>
+
+    <section id="form"><h2>Testing the Add Product form</h2>
+      <p>Cases whose steps open the product form (<i>click the 'Add Product' button</i>, <i>Click 'Edit' on a product</i>, <i>Click 'Save Product'</i>) are read with the form's own rules. They work with the wording QA sheets already use:</p>
+      <table class="stack-sm"><thead><tr><th>You write</th><th>The bot does</th></tr></thead><tbody>
+        <tr><td><code>Type the Product Name</code>, <code>Type the Selling Price</code>, <code>Fill name and price</code></td><td>Types the values from the <b>Test Data</b> column (<code>Name: 'Test Soap'</code>, <code>Price 500, Cost 350</code>), or a sensible value when there is none.</td></tr>
+        <tr><td><code>Enter Selling Price 100 and Cost Price 150</code>, <code>Enter Min Qty 10, Max Qty 50 …</code></td><td>Types the numbers given in the sentence.</td></tr>
+        <tr><td><code>Open 'Pricing details'</code>, <code>Open 'Additional data'</code></td><td>Opens that part of the form. Old names still work: <i>Description &amp; labels</i> → Basic Info, <i>Photos</i> → Gallery, <i>Pricing details</i> → Pricing.</td></tr>
+        <tr><td><code>Leave Product Name … empty and click 'Save Product'</code>, <code>Enter each invalid value one by one in …</code></td><td>Tries each value from Test Data (<code>Negative: -10 / Text: abc</code>) in each field, saving after each, and records what was kept, what was saved and the message shown.</td></tr>
+        <tr><td><code>Choose Variable</code>, <code>Choose attribute Color (Red, Blue) and Size (S, M)</code>, <code>Choose 'Price per variation' …</code></td><td>Builds the variations and fills each row's price, SKU and stock.</td></tr>
+        <tr><td><code>Upload 3 valid images</code>, <code>Try a 5MB image</code>, <code>Try a .gif</code></td><td>Uploads test images the bot makes itself (right size and type), and notes whether each was accepted and why not.</td></tr>
+        <tr><td><code>Click 'Create new category' and enter a name</code></td><td>Creates it from the dropdown, named <code>BTB &lt;case&gt; …</code>, and deletes it afterwards.</td></tr>
+        <tr><td><code>Sell 1 unit through POS</code>, <code>In POS, add 10 units of this product</code></td><td>Sells the saved product at the counter (Store tab, no customer) and reads the stock before and after.</td></tr>
+      </tbody></table>
+      <p>Expected results it checks include: <i>should (not) be saved</i>, <i>a message should say '…'</i> (it accepts the same meaning in other words, such as "already in use" for "must be unique"), <i>listed as Active and Simple with price ৳120.00</i>, <i>a storefront URL should be created from the name</i>, <i>Options should be: pcs, kg, …</i>, <i>counters x/60</i>, <i>Profit per unit should show −৳50 with a warning</i>, <i>only one product should be created</i>, and the variation, stock, wholesale and image checks.</p>
+      <div class="tip"><b>What it creates, and cleans up.</b> Every product it saves is named <code>BTB &lt;case id&gt; …</code> (for example <code>BTB AP-001 Test Soap</code>) and archived when the case ends. Categories, brands, labels and attribute values it creates are removed too. POS sales made by a case are real orders on the test store; their numbers are in the report.</div>
+      <p><b>Checked by hand, on purpose.</b> The bot never presses <b>Generate</b> in <i>Write with AI</i>, because each use is charged to the store wallet. It doesn't test two browser tabs editing the same product, or logging out mid-save. New products take a while to appear on the storefront, so storefront checks on a just-saved product are marked <b>not checked</b>, not failed.</p>
     </section>
 
     <section id="writing"><h2>Writing sentences the bot understands</h2>

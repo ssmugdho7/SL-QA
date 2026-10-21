@@ -806,7 +806,7 @@ export const EXPECT_RULES: ExpectRule[] = [
     pattern: /^a success message should appear$/i,
     check: async (t) => {
       const toast = [...t.toasts, ...t.snaps.map((s) => s.snap.toast)].filter(Boolean).join(' | ');
-      t.check('A success message appears', /delet|success|done|removed|deactivat|archiv/i.test(toast), toast || 'no message');
+      t.check('A success message appears', /delet|success|done|removed|deactivat|archiv|created|saved|added|updated/i.test(toast), toast || 'no message');
     },
   },
   {

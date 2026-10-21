@@ -4,6 +4,7 @@ import { pagePath, PAGE_NAMES } from '../pages.js';
 import { escapeRe, Missing } from '../ui.js';
 import { clickNamed, sidebarPath, STEP_RULES, type StepRule } from './steps.js';
 import { money } from './text.js';
+ import { FORM_RULES } from './form.js';
 
 /**
  * Step rules for plain-language bug reports ("Navigate to Create order/POS page", "Add a product to the cart",
@@ -115,7 +116,7 @@ async function typeAndObserve(t: CaseContext, field: Locator, value: string): Pr
 }
 
 /** Clicks "Add" on a POS product card (the named one when it exists), and remembers to empty the cart afterwards. */
-async function addToCart(t: CaseContext, hint: string): Promise<string> {
+export async function addToCart(t: CaseContext, hint: string): Promise<string> {
   if (!onPath(t, /\/dashboard\/pos/)) await openPage(t, '/dashboard/pos');
   const addButtons = () => t.page.getByRole('button', { name: /^\s*\+?\s*Add\s*$/ }).filter({ visible: true });
   const search = t.page.getByPlaceholder(/search products/i).filter({ visible: true }).first();
@@ -124,6 +125,7 @@ async function addToCart(t: CaseContext, hint: string): Promise<string> {
   if (wanted && (await search.count())) {
     await search.fill(wanted);
     await t.page.waitForTimeout(1500);
+    // An exact product the case made itself: its card is the only match.
     if (!(await addButtons().count())) {
       note = ` '${hint.slice(0, 60)}' is not in this store, so the first product in stock was used.`;
       await search.fill('');
@@ -397,4 +399,4 @@ async function plainClick(t: CaseContext, raw: string): Promise<string | void> {
 }
 
 /** All step rules, in the order they are tried. */
-export const ALL_STEP_RULES: StepRule[] = [...FIRST, ...STEP_RULES, ...LAST];
+export const ALL_STEP_RULES: StepRule[] = [...FORM_RULES, ...FIRST, ...STEP_RULES, ...LAST];

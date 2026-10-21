@@ -54,6 +54,36 @@ export class Api {
     return (r.data ?? []).map((o) => ({ ...o, reference: o.reference ?? o.order_number ?? `#${o.id}` }));
   }
 
+  async stockLevels(id: number): Promise<{ quantity: number; reserved: number; available: number; warehouses: { name: string; quantity: number }[] }> {
+    const r = await this.request<{ warehouses: { name: string; quantity: number }[]; totals: { quantity: number; reserved: number; available: number } }>('GET', `/catalog/products/${id}/stocks`);
+    return { ...r.totals, warehouses: r.warehouses };
+  }
+
+  async stockMovements(id: number): Promise<{ type: string; quantity: number; reason: string | null; reference: string | null; created_at?: string }[]> {
+    return (await this.request<{ data: any[] }>('GET', `/inventory/movements?product_id=${id}`)).data ?? [];
+  }
+
+  async brands(): Promise<{ id: number; name: string }[]> {
+    return (await this.request<{ data: { id: number; name: string }[] }>('GET', '/catalog/brands')).data;
+  }
+
+  async labels(): Promise<{ id: number; name: string }[]> {
+    return (await this.request<{ data: { id: number; name: string }[] }>('GET', '/catalog/labels')).data;
+  }
+
+  async attributes(): Promise<{ id: number; name: string; values: string[]; swatches: Record<string, string>; codes: Record<string, string>; is_active: boolean }[]> {
+    return (await this.request<{ data: any[] }>('GET', '/catalog/attributes')).data;
+  }
+
+  /** Removes attribute values a test added (the form saves new values to the shared attribute). */
+  async removeAttributeValues(name: string, values: string[]): Promise<void> {
+    const a = (await this.attributes()).find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (!a) return;
+    const keep = a.values.filter((v) => !values.includes(v));
+    if (keep.length === a.values.length) return;
+    await this.request('PUT', `/catalog/attributes/${a.id}`, { name: a.name, values: keep, swatches: a.swatches, codes: a.codes, is_active: a.is_active });
+  }
+
   async stores(): Promise<Store[]> {
     return (await this.request<{ stores: Store[] }>('GET', '/auth/me')).stores;
   }

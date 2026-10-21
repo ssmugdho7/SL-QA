@@ -5,6 +5,7 @@ const ACTION_VERBS = [
   'apply', 'change', 'check', 'choose', 'clear', 'click', 'close', 'compare', 'confirm', 'create', 'enter', 'find', 'go', 'log', 'look',
   'note', 'open', 'paste', 'pick', 'press', 'refresh', 'reload', 'repeat', 'return', 'save', 'scroll', 'select', 'set', 'switch',
   'tick', 'turn', 'type', 'use', 'wait', 'add', 'fill', 'navigate', 'observe', 'view', 'locate', 'tap', 'visit', 'verify',
+  'upload', 'leave', 'try', 'drag', 'remove', 'keep', 'edit', 'delete', 'sell', 'place', 'pick', 'watch', 'search', 'switch',
 ].join('|');
 
 const STEP_SEPARATOR = new RegExp(

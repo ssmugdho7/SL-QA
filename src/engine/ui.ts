@@ -111,7 +111,9 @@ export class Ui {
         const m = (el as HTMLElement).innerText.trim().match(/^([\s\S]+?)\s+(\d+)$/);
         if (m) tabs[m[1].trim()] = { count: Number(m[2]), active: el.getAttribute('aria-pressed') === 'true' };
       }
-      const table = main?.querySelector('table') ?? null;
+      // The list has a sticky header copy as its own <table>; read the one with body rows.
+      const tables = main ? [...main.querySelectorAll('table')] : [];
+      const table = tables.find((x) => x.querySelector('tbody tr')) ?? tables[0] ?? null;
       const listVisible = visible(table);
       const heads = listVisible ? [...table!.querySelectorAll('thead th')].map((th) => (th as HTMLElement).innerText.trim().toUpperCase()) : [];
       const nameCol = heads.findIndex((h) => h === 'PRODUCT' || h === 'NAME' || h === 'CUSTOMER');
@@ -230,8 +232,29 @@ export class Ui {
   }
 
   async search(text: string): Promise<void> {
+    const before = await this.showingText();
     await this.searchBox().fill(text);
     await this.page.waitForTimeout(400);
+    await this.settle();
+    await this.waitForListChange(before);
+  }
+
+  /** "Showing x–y of z" (or '' when the page has none). */
+  async showingText(): Promise<string> {
+    return ((await this.main.textContent().catch(() => '')) ?? '').match(SHOWING)?.[0] ?? '';
+  }
+
+  /** After a filter or search, the list re-fetches; wait (briefly) until its "Showing" text or URL settles on new data. */
+  async waitForListChange(before: string, timeout = 6_000): Promise<void> {
+    if (!before) return;
+    await this.page.waitForFunction(
+      ([src, prev]) => {
+        const m = (document.querySelector('main')?.textContent ?? '').match(new RegExp(src));
+        return !!m && m[0] !== prev;
+      },
+      [SHOWING.source, before] as const,
+      { timeout },
+    ).catch(() => undefined);
     await this.settle();
   }
 

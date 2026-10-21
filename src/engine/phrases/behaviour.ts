@@ -185,6 +185,9 @@ export const BEHAVIOUR_RULES: ExpectRule[] = [
         sort = t.noted.get('__sort') as SortResult;
       }
       if (!sort.before.length || !sort.after.length) return t.skip('Labels follow their cards after sorting', 'No #1, #2 … labels were found on the cards.');
+      // If sorting left the first cards where they were, nothing moved, so the labels cannot be judged.
+      const sameOrder = sort.after.slice(0, 6).every((a, i) => a.card === sort!.before[i]?.card);
+      if (sameOrder) return t.skip('Labels follow their cards after sorting', `Sorting by '${sort.option}' did not change the order of the first cards (${sort.after.slice(0, 3).map((x) => x.card).join(', ')}), so there was nothing to compare. Try it when the list has orders of different totals.`);
       const moved = sort.after.slice(0, 8).map((a) => ({ a, b: sort!.before.find((x) => x.card === a.card) })).filter((x) => x.b);
       await t.shot('after sorting');
       if (!moved.length) {

@@ -57,7 +57,10 @@ export function planFixtures(t: CaseContextLike): Plan {
   const many = Math.max(selectCount, /test products?|products? (that has |with )no orders/i.test(text) ? Math.max(1, ...counts.filter((n) => n <= 5)) : 0);
 
   // "Locate a product marked Variable" in a bug report looks at the store's own products; only test cases that act on one get a fixture.
-  if (/variable product|variants?:|view variants/i.test(text) && !/\b(?:locate|observe|look at|find|view)\b[^.\n]*\bvariable\b/i.test(steps)) {
+  // A bug report that only says "Locate a product marked with the Variable tag" looks at the store's own products;
+  // test cases that act on one ("Find a Variable product … click 'View variants'") get their own.
+  const onlyLooks = /\blocate\b[^.\n]*\bmarked\b[^.\n]*\bvariable\b/i.test(steps) && !/view variants|variants?:/i.test(text);
+  if (/variable product|variants?:|view variants/i.test(text) && !onlyLooks) {
     add('Variable', { product_type: 'variable', price: null, variant_axes: ['Weight'], variants: VARIANTS });
   }
   if (/\b(\d+)-character name/i.test(text)) {

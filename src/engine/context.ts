@@ -82,6 +82,8 @@ export class CaseContext {
   orderedProduct?: Product;
   orderedSample?: { order_id: number; reference: string };
   dialogsFired = 0;
+  /** Browser "Leave this page?" prompts seen when the bot navigated away from unsaved changes. */
+  leavePrompts = 0;
   /** Every toast message shown during the case (toasts vanish after a few seconds, so snapshots can miss them). */
   readonly toasts: string[] = [];
   lastDownload: string | null = null;
@@ -136,6 +138,12 @@ export class CaseContext {
       new MutationObserver(() => setTimeout(report, 50)).observe(document, { childList: true, subtree: true });
     });
     page.on('dialog', async (d) => {
+      // "Leave this page?" only appears when the bot itself navigates away: count it, then leave as intended.
+      if (d.type() === 'beforeunload') {
+        this.leavePrompts++;
+        await d.accept().catch(() => undefined);
+        return;
+      }
       this.dialogsFired++;
       await d.dismiss().catch(() => undefined);
     });
