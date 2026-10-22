@@ -1,6 +1,6 @@
 # SL QA
 
-An in-house QA tool for the slshop.cloud dashboard. It uses no AI.
+An in-house QA tool for the slshop.cloud dashboard. It runs on fixed rules; an AI (free keys first) helps only with sentences the rules miss or steps that fail, and never decides a verdict.
 
 Add a test sheet: a Google Sheet link, or a CSV/XLSX upload. The tool reads each test case's steps and expected results as plain sentences, runs them in a real browser against the live dashboard, and shows what passed and what failed. Each failure comes with screenshots, the likely cause and a ready-to-paste fix prompt.
 
@@ -49,7 +49,7 @@ Cases whose steps open the product form are read with form rules (`src/engine/ph
 
 ### AI rewrites (review)
 
-Sentences no rule understands can be rewritten by an AI into a small step language (`GO TO`, `CLICK`, `TYPE … INTO`, `SELECT … IN`, `TURN ON/OFF`, `EXPECT TEXT`, `EXPECT BUTTON … ENABLED`, `EXPECT FIELD … =`, …; see `src/engine/phrases/actions.ts`). On a suite, **Ask AI to suggest rewrites** → **Review rewrites** → edit/approve. Only approved rewrites run; they are stored in `data/translations.json` and reused, so each sentence needs the AI once. The AI never clicks or decides verdicts.
+Sentences no rule understands can be rewritten by an AI into a small step language (`GO TO`, `CLICK`, `TYPE … INTO`, `SELECT … IN`, `TURN ON/OFF`, `EXPECT TEXT`, `EXPECT BUTTON … ENABLED`, `EXPECT FIELD … =`, …; see `src/engine/phrases/actions.ts`). On a suite, **Ask AI to suggest rewrites** → **Review rewrites** → edit/approve. Live help (above) also saves its rewrites here as suggestions. Approved rewrites are stored in `data/translations.json` and run without calling the AI, so each sentence needs it once; rejected ones are not reused. The AI never clicks or decides verdicts.
 
 **Keys: free first, paid as a capped backup** (`src/engine/ai/providers.ts`). SL QA tries every free provider that has a key, in order: `GEMINI_API_KEY` (Google AI Studio), `GROQ_API_KEY`, `OPENROUTER_API_KEY` (only `:free` models), `MISTRAL_API_KEY`. A provider that fails (bad key, quota used up, server error, unreadable answer) is skipped for a while and the next is tried. Paid keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `CEREBRAS_API_KEY`) are used only when every free one failed, at most `AI_PAID_DAILY_LIMIT` times a day (default 20; 0 = never). Models can be changed per provider (`GEMINI_MODEL`, `GROQ_MODEL`, …); several keys per provider can be comma-separated. Usage and cool-downs are kept in `data/ai-usage.json`; the **AI keys** page (`/settings/ai`) shows the status. With no key, SL QA stays zero-AI. Lines in the step language can also be typed straight into a sheet.
 
@@ -69,8 +69,8 @@ Free-form bug sheets work too: only an **Expected Result**, a **Description** ho
 ### What happens per row
 
 1. **Page inspection.** The bot opens the row's page in a logged-in browser and records the HTTP status, load time, console errors and warnings, every failed or slow (>3 s) request, broken images, error text such as "Something went wrong" or "NaN", and a screenshot.
-2. **Steps.** Each step it understands is carried out. A step it doesn't understand is skipped and noted, and the row continues.
-3. **Expected vs actual.** Each expected claim is checked by a rule. If no rule matches, the bot checks what plain page evidence can settle: quoted text or buttons that should (or shouldn't) be on the page, "loads without errors", "redirects to login", and "no NaN/undefined". If nothing can be compared, the page's own health becomes the verdict.
+2. **Steps.** Each step it understands is carried out. A step it doesn't understand is handed to the AI (when a key is set) and the answer is run, labelled AI; without a key it is skipped and noted, and the row continues. A step that fails on the page gets one AI-corrected retry.
+3. **Expected vs actual.** Each expected claim is checked by a rule. If no rule matches, the bot checks what plain page evidence can settle: quoted text or buttons that should (or shouldn't) be on the page, "loads without errors", "redirects to login", and "no NaN/undefined". If that doesn't settle it either, the AI turns the claim into exact checks (a failed AI check gives **Review**, not Fail). If nothing can be compared, the page's own health becomes the verdict.
 
 The report, `runs/<id>/report.md` (the latest is also copied to `./report.md`), starts with **Findings**: per failed row, what was expected, what the page did, where it shows up (failed request, console error) and a screenshot. In the web app, open a run and click **View report**.
 
@@ -80,6 +80,7 @@ The report, `runs/<id>/report.md` (the latest is also copied to `./report.md`), 
 |---|---|
 | Pass | Every expectation was checked and met. |
 | Fail | At least one expectation was not met, or a control named in a step is missing from the page. These are the findings. |
+| Review | A check written by AI did not hold. A person should look: a real bug, or the AI misread the sentence. |
 | Partial | Everything checked passed, but some expectations could not be checked (the reason is shown). |
 | Blocked | The case needs something that doesn't exist (a staff account, an empty store), or a step was not understood. |
 | Error | The bot itself broke. This is a bot problem, not a finding about the app. |

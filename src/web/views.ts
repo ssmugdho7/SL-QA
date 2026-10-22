@@ -58,10 +58,11 @@ function counts(results: CaseResult[]): string {
 
 function statusBadge(run: Run): string {
   const failing = run.results.some((r) => r.verdict === 'Fail');
+  const toReview = run.results.some((r) => r.verdict === 'Review');
   const [cls, label] = {
     queued: ['muted', 'Waiting'],
     running: ['running', 'Running'],
-    done: failing ? ['fail', 'Finished · issues found'] : ['pass', 'Finished'],
+    done: failing ? ['fail', 'Finished · issues found'] : toReview ? ['review', 'Finished · some to review'] : ['pass', 'Finished'],
     failed: ['error', 'Stopped by an error'],
     cancelled: ['muted', 'Cancelled'],
   }[run.status];
@@ -112,7 +113,7 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
         <label data-kind="upload">File <input type="file" name="file" accept=".csv,.xlsx"></label>
         <label>Start page <input name="pagePath" value="${esc(f.pagePath)}" required pattern="/.*" title="Starts with /, for example /dashboard/products">
           <span class="hint">The dashboard page used for cases that don't name their own page.</span></label>
-        <p class="hint">The sheet needs an <b>Expected Result</b> column; a <b>URL</b> column tells the bot which page each row is about. <a href="/help#sheet">Sheet format</a> · <a href="/help/sample.csv">Sample sheet</a></p>
+        <p class="hint">The sheet needs an <b>Expected Result</b> column, or a <b>Description</b> column holding a whole bug report pasted from Jira. A <b>URL</b> column tells the bot which page each row is about. <a href="/help#sheet">Sheet format</a> · <a href="/help/sample.csv">Sample sheet</a></p>
         <div><button class="primary">Add suite</button></div>
       </form>
     </section>
@@ -242,7 +243,7 @@ export function suitePage(s: Suite, recent: Run[], flash?: string, ai?: { unknow
 function previewHtml(c: TestCase): string {
   const p = previewCase(c);
   const item = (text: string, rule: string | null, via?: 'ai' | 'live') =>
-    `<li class="${rule ? 'ok' : 'warn'}">${rule ? '✓' : '?'} ${esc(text)}${rule ? ` <span class="rule">${esc(rule)}${via ? ' · <span class="tag ai">AI rewrite, approved</span>' : ''}</span>` : ' <span class="rule">not understood: reword it (<a href="/help#writing">tips</a>) or let the AI suggest a rewrite</span>'}</li>`;
+    `<li class="${rule ? 'ok' : 'warn'}">${rule ? '✓' : '?'} ${esc(text)}${rule ? ` <span class="rule">${esc(rule)}${via ? ' · <span class="tag ai">AI rewrite, approved</span>' : ''}</span>` : ' <span class="rule">not understood by the rules: with an AI key, the AI works it out during the run; or reword it (<a href="/help#writing">tips</a>)</span>'}</li>`;
   return `<div class="preview"><b>Steps</b><ol>${p.steps.map((s) => `<li>${esc(s.sentence)}<ul>${s.clauses.map((x) => item(x.text, x.rule, x.via)).join('')}</ul></li>`).join('')}</ol>
     <b>Expected</b><ul>${p.expects.map((e) => e.claims.map((x) => item(x.text, x.rule, x.via)).join('')).join('')}</ul></div>`;
 }
@@ -258,10 +259,10 @@ export function rewriteBanner(s: Suite, unknownCount: number, pending: number, p
   if (!unknownCount && !pending) return '';
   const action = provider
     ? `<form method="post" action="/suites/${s.id}/rewrites/suggest" class="inline"><button class="primary">✨ Ask AI to suggest rewrites</button></form>`
-    : '<span class="sub">To get AI suggestions, add a free key such as <code>GEMINI_API_KEY</code> or <code>GROQ_API_KEY</code> to <code>.env</code> and restart. See <a href="/help#ai-keys">How to use → AI keys</a>.</span>';
+    : '<span class="sub">Without an AI key these sentences are skipped. To get AI help, add a free key such as <code>GEMINI_API_KEY</code> or <code>GROQ_API_KEY</code> to <code>.env</code> and restart. See <a href="/help#ai-keys">How to use → AI keys</a>.</span>';
   return `<div class="card ai-banner"><div><b>${plural(unknownCount, 'sentence')} the bot does not understand yet.</b>
     ${pending ? `${plural(pending, 'AI suggestion')} waiting for review.` : ''}
-    <div class="sub">The AI only rewrites them into simple steps (CLICK, TYPE, EXPECT TEXT…). Nothing it writes runs until you approve it, and approved rewrites are reused, so each sentence needs the AI only once.${provider ? ` Tries, in order: ${esc(provider.chain.join(' → '))}. Paid calls today: ${provider.paidUsed} of ${provider.paidLimit}.` : ''}</div></div>
+    <div class="sub">During a run, the AI turns them into simple steps (CLICK, TYPE, EXPECT TEXT…) on the spot; those steps are marked AI in the results. You can also get suggestions now and check them first. Approved rewrites are reused without calling the AI, so each sentence needs it only once.${provider ? ` Tries, in order: ${esc(provider.chain.join(' → '))}. Paid calls today: ${provider.paidUsed} of ${provider.paidLimit}.` : ''}</div></div>
     <div class="toolbar">${action}${pending || unknownCount ? `<a class="button" href="/suites/${s.id}/rewrites">Review rewrites${pending ? ` (${pending})` : ''}</a>` : ''}</div></div>`;
 }
 
@@ -286,7 +287,7 @@ export function rewritesPage(s: Suite, rows: RewriteRow[], unknown: { kind: stri
     'AI rewrites',
     `<p class="crumbs"><a href="/">Suites</a> / <a href="/suites/${s.id}">${esc(s.name)}</a> /</p>
     <h1>AI rewrites</h1>
-    <p class="sub">Sentences the bot did not understand, rewritten by AI into simple actions it can run. Check each one, edit it if needed, then approve. Approved rewrites are saved and reused by every suite.</p>
+    <p class="sub">Sentences the bot's rules do not understand, rewritten by AI into simple actions it can run. Suggestions also come in automatically from runs, where the AI helped live. Check each one, edit it if needed, then approve: approved rewrites are saved, reused by every suite, and run without calling the AI. Rejected ones are not used again, and the AI is asked afresh next run.</p>
     ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
     ${provider ? `<p class="sub">AI providers, tried in this order: <b>${esc(provider.chain.join(' → '))}</b>. Paid calls today: ${provider.paidUsed} of ${provider.paidLimit} · <a href="/settings/ai">AI keys</a></p>` : ''}
     <div class="toolbar">
@@ -315,7 +316,7 @@ export function aiKeysPage(rows: ReturnType<typeof import('../engine/ai/provider
     'AI keys',
     `<p class="crumbs"><a href="/">Suites</a> /</p>
     <h1>AI keys</h1>
-    <p class="sub">SL QA asks the AI only to rewrite sentences it does not understand. It tries the <b>free</b> providers first, top to bottom. A provider that fails (bad key, free quota used up, error) is skipped for a while and the next one is tried. <b>Paid</b> providers are used only when every free one failed, and at most <b>${paid.limit}</b> times a day.</p>
+    <p class="sub">SL QA asks the AI only when its own rules fall short: a step or expected result it does not understand, or a step that fails on the page (it then suggests a corrected step). Pass and Fail are always decided by the bot's own checks. It tries the <b>free</b> providers first, top to bottom. A provider that fails (bad key, free quota used up, error) is skipped for a while and the next one is tried. <b>Paid</b> providers are used only when every free one failed, and at most <b>${paid.limit}</b> times a day.</p>
     ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
     <p>Paid calls today: <b>${paid.used} of ${paid.limit}</b> <span class="sub">(change with <code>AI_PAID_DAILY_LIMIT</code>; 0 = never use paid keys)</span></p>
     ${wrap(`<table><thead><tr><th>Provider</th><th>.env name</th><th>Key</th><th>Model</th><th>Today</th><th></th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table>`)}
@@ -335,6 +336,7 @@ export const ACTION_HELP = `<table class="stack-sm"><thead><tr><th>Line</th><th>
   <tr><td><code>EXPECT TEXT 'Product created'</code> · <code>EXPECT NO TEXT 'Error'</code></td><td>Text on the page or in a pop-up message.</td></tr>
   <tr><td><code>EXPECT MESSAGE 'required'</code> · <code>EXPECT URL '/dashboard/products'</code></td><td>A pop-up message; the page address.</td></tr>
   <tr><td><code>EXPECT BUTTON 'Save' DISABLED</code> · <code>EXPECT FIELD 'Price' = '100'</code> · <code>EXPECT COUNT 'Showing 1–1 of 1'</code></td><td>Button state, a field's value, a count.</td></tr>
+  <tr><td><code>EXPECT VALUE 'On Hand' = '13'</code> · <code>EXPECT VALUE 'Total' &gt; '0'</code></td><td>The number or text shown next to a label (cards, detail rows, totals). Also <code>!=</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>.</td></tr>
 </tbody></table><p class="sub">You can also type these lines straight into a sheet or the Add case form; the bot understands them without AI.</p>`;
 
 // ── Runs ───────────────────────────────────────────────────────────────
@@ -357,6 +359,8 @@ export function runPage(run: Run, earlier: Run[] = []): string {
   const live = run.status === 'running' || run.status === 'queued';
   const pct = run.caseIds.length ? Math.round((run.results.length / run.caseIds.length) * 100) : 0;
   const issues = run.results.flatMap((r) => r.checks.filter((c) => c.state === 'fail').map((c) => ({ r, c })));
+  const reviews = run.results.flatMap((r) => r.checks.filter((c) => c.state === 'review').map((c) => ({ r, c })));
+  const rerun = [...new Set([...issues, ...reviews].map((i) => i.r.tc.id))];
   const changes = diff(run, earlier);
   const has = run.results.length > 0;
   return layout(
@@ -374,17 +378,18 @@ export function runPage(run: Run, earlier: Run[] = []): string {
         : `<div class="toolbar">
            ${has ? `<a class="button primary" href="/runs/${run.id}/report">View report</a><a class="button" href="/runs/${run.id}/report.md" download>⬇ Download report (.md)</a>` : ''}
            <form method="post" action="/suites/${run.suiteId}/run" class="inline">${run.caseIds.map((id) => `<input type="hidden" name="case" value="${esc(id)}">`).join('')}<button>↻ Run again</button></form>
-           ${issues.length ? `<form method="post" action="/suites/${run.suiteId}/run" class="inline">${[...new Set(issues.map((i) => i.r.tc.id))].map((id) => `<input type="hidden" name="case" value="${esc(id)}">`).join('')}<button>↻ Re-run failed only</button></form>` : ''}
+           ${rerun.length ? `<form method="post" action="/suites/${run.suiteId}/run" class="inline">${rerun.map((id) => `<input type="hidden" name="case" value="${esc(id)}">`).join('')}<button>↻ Re-run failed only</button></form>` : ''}
            <span class="spacer"></span>
            <form method="post" action="/runs/${run.id}/delete" class="inline" onsubmit="return confirm('Delete this run, its report and screenshots? This cannot be undone.')"><button class="danger">Delete run</button></form></div>`
     }
     ${changes}
     ${issues.length ? `<h2>Problems found (${issues.length})</h2><ul class="issues">${issues.map(({ r, c }) => `<li><a href="#${esc(r.tc.id)}"><b>${esc(r.tc.id)}</b></a> ${esc(c.label)} — <span class="actual">${esc(c.actual)}</span>${c.cause ? `<div class="cause">Likely cause: ${esc(c.cause)}</div>` : ''}</li>`).join('')}</ul>` : ''}
+    ${reviews.length ? `<h2>To review (${reviews.length})</h2><p class="sub">Checks the AI wrote from the sheet's sentence did not hold. Each is either a real bug or a misread sentence: look at the screenshot, then report the bug or correct the check under <a href="/suites/${esc(run.suiteId)}/rewrites">Review rewrites</a>.</p><ul class="issues">${reviews.map(({ r, c }) => `<li><a href="#${esc(r.tc.id)}"><b>${esc(r.tc.id)}</b></a> ${esc(c.label)} — <span class="actual">${esc(c.actual)}</span></li>`).join('')}</ul>` : ''}
     ${has ? '' : live ? '' : '<div class="empty"><b>No cases were checked in this run.</b><br>It stopped before the first case finished. Click Run again to retry.</div>'}
     ${has ? `<h2>Results</h2>` : ''}
     ${has ? wrap(`<table><thead><tr><th>ID</th><th>Case</th><th>Result</th><th>Main finding</th></tr></thead><tbody>${run.results
       .map((r) => {
-        const f = r.checks.find((c) => c.state === 'fail');
+        const f = r.checks.find((c) => c.state === 'fail') ?? r.checks.find((c) => c.state === 'review');
         const finding = f ? `${f.label}: ${f.actual}` : r.verdict === 'Blocked' ? r.notes.at(-1) ?? '' : r.error ?? '';
         return `<tr><td><a href="#${esc(r.tc.id)}">${esc(r.tc.id)}</a></td><td>${esc(r.tc.title)}</td><td>${verdictBadge(r.verdict)}</td><td class="sub">${esc(finding.slice(0, 180))}</td></tr>`;
       })
@@ -542,7 +547,7 @@ export function helpPage(): string {
     `<article class="help">
     <h1>How to use SL QA</h1>
     <p class="lead">SL QA is a robot tester for the slshop.cloud dashboard. You give it a list of things that <b>should</b> be true, such as <i>"the Add Product button is visible"</i>. It opens each page in a real browser, logged in as the store owner, and checks them one by one. Then it writes a report: what works, what doesn't, and where the problem is.</p>
-    <p>You don't need to write any code. If you can fill in a spreadsheet, you can use it. It doesn't use AI: it follows fixed rules, so the same list gives the same answer every time.</p>
+    <p>You don't need to write any code. If you can fill in a spreadsheet, you can use it. It follows fixed rules first, so the same list gives the same answer every time. Only when a sentence is outside its rules, or a step fails on the page, does it ask an AI for help (if an AI key is set; see <a href="#ai">AI help</a>). Pass and Fail always come from the bot's own checks.</p>
     <div class="tip"><b>Learn by doing:</b> the <a href="#example">worked example</a> at the end of this page sets up 4 ready-made cases in one click, runs them, and shows you how to read the result and write your own. It takes about 5 minutes.</div>
 
     <section class="glance"><h2>The whole thing in 30 seconds</h2>
@@ -599,7 +604,7 @@ export function helpPage(): string {
         <li><span class="warn">2 of 8 not understood</span>: open <b>How the bot reads it</b> under the case title to see which sentences are marked <b>?</b>.</li>
       </ul>
       <p>Each understood sentence shows how the bot will check it. Labels starting with <b>page check:</b> mean the bot checks the page directly: is the quoted text there, are there errors, does it redirect to login.</p>
-      <p>Cases with <b>?</b> sentences still run, but the bot skips the parts it doesn't understand and says so in the results. To fix that, reword them (see <a href="#writing">tips</a>) in the sheet and click <b>↻ Re-read sheet</b>, or click <b>Edit</b> on the case.</p>
+      <p>Cases with <b>?</b> sentences still run. With an AI key set, the AI works those sentences out during the run (see <a href="#ai">AI help</a>); without one, the bot skips them and says so in the results. To make them exact, reword them (see <a href="#writing">tips</a>) in the sheet and click <b>↻ Re-read sheet</b>, or click <b>Edit</b> on the case.</p>
     </section>
 
     <section id="run"><h2><span class="num">4</span> Run the checks</h2>
@@ -634,7 +639,7 @@ export function helpPage(): string {
       <ul>
         <li><b>⬇ Download report (.md)</b>: save or share the report as a file. <b>Print / save as PDF</b> on the report page makes a PDF.</li>
         <li><b>↻ Run again</b>: check the same cases again, for example after a fix. If you run a suite again, the run page shows <b>Since the previous run</b>: what newly fails and what's fixed.</li>
-        <li><b>↻ Re-run failed only</b>: check just the cases that failed.</li>
+        <li><b>↻ Re-run failed only</b>: check just the cases that failed or are marked Review.</li>
         <li><b>Fix prompt</b> (under each failed case): text a developer can paste straight into their tools.</li>
       </ul>
     </section>
@@ -700,7 +705,7 @@ export function helpPage(): string {
         <tr><td>"The position <b>numbers</b> should <b>follow</b> the cards after sorting"</td><td>Each card's #N before and after the sort.</td></tr>
         <tr><td>Anything with <b>'quoted text'</b>, "no errors", "no NaN", "redirect to login"</td><td>Checked on the page directly (see <a href="#writing">Writing sentences</a>).</td></tr>
       </tbody></table>
-      <p>Open <b>How the bot reads it</b> under a case to see which rule each sentence got. A <b>?</b> means it wasn't understood: that sentence is skipped and the report says so. Every check in the report shows the numbers it measured, so you can judge it yourself.</p>
+      <p>Open <b>How the bot reads it</b> under a case to see which rule each sentence got. A <b>?</b> means the rules don't cover it: the AI handles it during the run if a key is set, otherwise it is skipped and the report says so. Every check in the report shows the numbers it measured, so you can judge it yourself.</p>
       <div class="tip"><b>Heads-up:</b> a step like <i>Click the Place order button</i> really places an order on the test store, for the customer <b>BTB Test</b>. The report gives the order number. The cart is emptied when the case ends.</div>
     </section>
 
@@ -781,7 +786,7 @@ export function helpPage(): string {
         <dt>The Run button is greyed out</dt>
         <dd>No case is ticked, or the suite is empty. Tick at least one case, or click <b>＋ Add case</b>.</dd>
         <dt>Does it change anything on the site?</dt>
-        <dd>Some checks create, edit or delete products. Everything the robot creates is named <code>BTB …</code> and archived afterwards, so you may see these in the <b>Archived</b> tab. Steps that say <i>Place order</i> create a real order for the customer <b>BTB Test</b>; the report gives its number. Just opening a page and checking it changes nothing.</dd>
+        <dd>Some checks create, edit or delete products. Everything the robot creates is named <code>BTB …</code> and archived afterwards, so you may see these in the <b>Archived</b> tab. Steps that say <i>Place order</i> create a real order for the customer <b>BTB Test</b>; the report gives its number. When AI-driven steps change a product, they use the bot's own <code>BTB &lt;case&gt; AI test item</code>. Sales through POS in a case are real orders on the test store. Just opening a page and checking it changes nothing.</dd>
         <dt>Which account does it use?</dt>
         <dd>The store owner account set up for SL QA. You don't need to log in yourself.</dd>
         <dt>A case failed, but the page looks fine to me</dt>
@@ -798,6 +803,9 @@ export function helpPage(): string {
         <dt>Run</dt><dd>One go of the robot through the cases you ticked. Each run has its own report.</dd>
         <dt>Start page</dt><dd>The page used for cases that don't name their own page.</dd>
         <dt>Page health</dt><dd>The automatic check of a page's errors, failed loads and speed, done for every case.</dd>
+        <dt>Step language</dt><dd>Exact lines such as <code>CLICK 'Save Product'</code> or <code>EXPECT TEXT 'Saved'</code> that the bot always understands (see <a href="#ai">AI help</a>).</dd>
+        <dt>AI rewrite</dt><dd>A sentence turned into step-language lines by AI. Approve it under <b>Review rewrites</b> and the bot reuses it without AI.</dd>
+        <dt>Review</dt><dd>A result that needs a person: a check the AI wrote did not hold.</dd>
       </dl>
     </section>
 
@@ -980,7 +988,7 @@ details { margin:6px 0; } summary { cursor:pointer; color:var(--muted); font-siz
 .issues { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 12px 12px 32px; } .issues li { margin:6px 0; }
 .actual { color:var(--fail); } .cause { color:var(--muted); font-size:12.5px; margin-top:2px; }
 .case { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 20px; margin:16px 0; scroll-margin-top:70px; }
-.checks td:first-child { width:24px; font-weight:700; } .checks tr.pass td:first-child { color:var(--pass); } .checks tr.fail td:first-child { color:var(--fail); } .checks tr.skip td:first-child { color:var(--muted); } .checks tr.skip { color:var(--muted); }
+.checks { table-layout:fixed; width:100%; } .checks td { overflow-wrap:anywhere; } .checks td:first-child { width:24px; font-weight:700; } .checks tr.pass td:first-child { color:var(--pass); } .checks tr.fail td:first-child { color:var(--fail); } .checks tr.skip td:first-child { color:var(--muted); } .checks tr.skip { color:var(--muted); }
 .note { color:var(--muted); font-size:12.5px; margin:6px 0; border-left:3px solid var(--line); padding-left:8px; }
 .steps { font-size:12.5px; } .steps li.failed, .steps li.unmatched { color:var(--fail); } .steps li.skipped { color:var(--muted); }
 .shots { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; } .shots a { display:grid; gap:2px; width:200px; text-decoration:none; color:var(--muted); font-size:11.5px; } .shots img { width:200px; border:1px solid var(--line); border-radius:4px; }
