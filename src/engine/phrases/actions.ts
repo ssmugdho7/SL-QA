@@ -30,10 +30,15 @@ function exactOrStarts(name: string): RegExp {
 async function target(t: CaseContext, name: string): Promise<Locator> {
   const page = t.page;
   const exact = new RegExp(`^\\s*${escapeRe(name)}\\s*$`, 'i');
-  const scopes = (await t.ui.dialog().count()) ? [t.ui.dialog(), page.locator('body')] : [page.locator('body')];
-  for (const scope of scopes) {
+  // Open dialog first, then the page's own content, then anywhere (the sidebar menu repeats many names: Stock, Orders…).
+  const main = page.locator('main, body:not(:has(main))').first();
+  const scopes = (await t.ui.dialog().count()) ? [t.ui.dialog(), main, page.locator('body')] : [main, page.locator('body')];
+  const dialogOpen = (await t.ui.dialog().count()) > 0;
+  for (const [si, scope] of scopes.entries()) {
+    // With a dialog open, things on the page behind it cannot be clicked; only look there if nothing else matches.
+    if (dialogOpen && si > 0 && si < scopes.length - 1) continue;
     for (const re of [exact, exactOrStarts(name)]) {
-      for (const role of ['button', 'link', 'tab', 'menuitem', 'menuitemradio', 'option', 'checkbox', 'switch', 'radio'] as const) {
+      for (const role of ['tab', 'button', 'link', 'menuitem', 'menuitemradio', 'option', 'checkbox', 'switch', 'radio'] as const) {
         const hit = scope.getByRole(role, { name: re }).filter({ visible: true }).first();
         if (await hit.count()) return hit;
       }
@@ -94,10 +99,31 @@ export const ACTION_RULES: StepRule[] = [
     name: 'click',
     pattern: re(`(double )?click ${q}(?: (?:in|inside) ${q})?`),
     run: async (t, m) => {
-      const scope = m[3] ? t.page.getByRole('dialog', { name: new RegExp(escapeRe(m[3]), 'i') }).or(t.page.locator('section, form, aside').filter({ hasText: m[3] })).first() : null;
-      const el = scope && (await scope.count()) ? scope.getByText(m[2], { exact: true }).or(scope.getByRole('button', { name: exactOrStarts(m[2]) })).first() : await target(t, m[2]);
-      if (m[1]) await el.dblclick();
-      else await el.click();
+      let el: Locator | null = null;
+      if (m[3]) {
+        // "IN '<x>'": a dialog or section titled x, or a list row / card that contains x (a product's own buttons).
+        const scopes = [
+          t.page.getByRole('dialog', { name: new RegExp(escapeRe(m[3]), 'i') }),
+          t.page.locator('tbody tr, article, li').filter({ hasText: m[3] }),
+          t.page.locator('section, form, aside, [role=region]').filter({ hasText: m[3] }),
+        ];
+        for (const sc of scopes) {
+          const box = sc.filter({ visible: true }).first();
+          if (!(await box.count())) continue;
+          const hit = box.getByRole('button', { name: exactOrStarts(m[2]) }).or(box.getByRole('link', { name: exactOrStarts(m[2]) })).or(box.getByLabel(new RegExp(`^\\s*${escapeRe(m[2])}\\s*$`, 'i'))).or(box.getByText(m[2], { exact: true })).filter({ visible: true }).first();
+          if (await hit.count()) { el = hit; break; }
+        }
+      }
+      el ??= await target(t, m[2]);
+      const go = (force = false) => (m[1] ? el!.dblclick({ timeout: 8_000, force }) : el!.click({ timeout: 8_000, force }));
+      // Something may still cover it (a closing dialog, a toast): wait, close stray popups, then try once more.
+      await go().catch(async () => {
+        await t.page.waitForTimeout(800);
+        const dlg = t.ui.dialog();
+        if ((await dlg.count()) && !(await dlg.locator(':scope').filter({ has: el! }).count())) await t.page.keyboard.press('Escape');
+        await t.page.waitForTimeout(400);
+        await go().catch(() => go(true));
+      });
       await t.ui.settle();
       return undefined;
     },
@@ -125,14 +151,35 @@ export const ACTION_RULES: StepRule[] = [
     run: async (t, m) => {
       const native = t.page.getByLabel(new RegExp(escapeRe(m[2]), 'i')).and(t.page.locator('select')).first();
       if (await native.count()) return void (await native.selectOption({ label: m[1] }));
+      // "IN '<dialog title>'": the choice is a button / radio / tab inside that open dialog.
+      const dlg = t.page.locator('[role=dialog],[role=alertdialog]').filter({ visible: true }).filter({ hasText: m[2] }).last();
+      if (await dlg.count()) {
+        const choice = dlg.getByRole('radio', { name: exactOrStarts(m[1]) }).or(dlg.getByRole('button', { name: exactOrStarts(m[1]) })).or(dlg.getByRole('tab', { name: exactOrStarts(m[1]) })).or(dlg.getByText(m[1], { exact: true })).filter({ visible: true }).first();
+        if (await choice.count()) {
+          await choice.click({ timeout: 8_000 });
+          await t.page.waitForTimeout(300);
+          return undefined;
+        }
+      }
+      // A choice already on screen (radio, tab, chip, button) needs no dropdown.
+      const onScreen = t.page.getByRole('radio', { name: exactOrStarts(m[1]) }).or(t.page.getByRole('tab', { name: exactOrStarts(m[1]) })).filter({ visible: true }).first();
+      if (await onScreen.count()) {
+        await onScreen.click({ timeout: 8_000 });
+        await t.page.waitForTimeout(300);
+        return undefined;
+      }
       const opener = await target(t, m[2]).catch(async () => field(t, m[2]));
-      await opener.click();
+      await opener.click({ timeout: 8_000 }).catch(() => opener.click({ timeout: 8_000, force: true }));
       await t.page.waitForTimeout(400);
       const search = t.page.locator('[cmdk-input], [role=listbox] input, [data-radix-popper-content-wrapper] input').filter({ visible: true }).first();
       if (await search.count()) await search.fill(m[1]);
       const option = t.page.getByRole('option', { name: new RegExp(`^\\s*${escapeRe(m[1])}\\s*$`, 'i') }).or(t.page.getByRole('menuitem', { name: new RegExp(`^\\s*${escapeRe(m[1])}\\s*$`, 'i') })).filter({ visible: true }).first();
-      if (!(await option.count())) throw new Missing(`option '${m[1]}' in '${m[2]}'`, await t.page.getByRole('option').filter({ visible: true }).allInnerTexts());
-      await option.click();
+      if (!(await option.count())) {
+        const seen = (await t.page.getByRole('option').or(t.page.getByRole('menuitem')).filter({ visible: true }).allInnerTexts()).map((x) => x.trim()).filter(Boolean);
+        await t.page.keyboard.press('Escape');
+        throw new Missing(`option '${m[1]}' in '${m[2]}'`, seen);
+      }
+      await option.click({ timeout: 8_000 });
       await t.ui.settle();
       return undefined;
     },
@@ -228,6 +275,43 @@ export const ACTION_EXPECTS: ExpectRule[] = [
       const v = await f.inputValue().catch(async () => (await f.innerText()).trim());
       const ok = m[2] === '=' ? v === m[3] : m[2] === '!=' ? v !== m[3] : v.includes(m[3]);
       t.check(`'${m[1]}' ${m[2]} '${m[3]}'`, ok, `the field shows "${v}"`);
+    },
+  },
+  {
+    name: 'expect value',
+    // "EXPECT VALUE 'On Hand' = '13'" — the number or text shown next to a label (cards, detail lists, totals).
+    pattern: re(`expect value ${q} (=|>=|<=|>|<|!=) ${q}`),
+    check: async (t, m) => {
+      const read = await t.page.evaluate((label) => {
+        const v = (e: Element) => e.getClientRects().length > 0;
+        const want = label.toLowerCase().replace(/\s+/g, ' ').trim();
+        const els = [...document.querySelectorAll('main *, [role=dialog] *')].filter((e) => v(e) && e.children.length === 0 && (e as HTMLElement).innerText?.replace(/\s+/g, ' ').trim().toLowerCase() === want);
+        for (const el of els) {
+          // The value is the next text in the same small group (a card, a definition row, a table cell below the header).
+          let box: HTMLElement | null = el.parentElement;
+          for (let i = 0; i < 3 && box; i++) {
+            const parts = box.innerText.split('\n').map((x) => x.trim()).filter(Boolean);
+            const at = parts.findIndex((x) => x.toLowerCase() === want);
+            if (at >= 0 && parts[at + 1]) return parts[at + 1];
+            box = box.parentElement;
+          }
+          const th = el.closest('th');
+          if (th) {
+            const col = [...(th.parentElement?.children ?? [])].indexOf(th);
+            const cell = th.closest('table')?.querySelector('tbody tr')?.children[col] as HTMLElement | undefined;
+            if (cell) return cell.innerText.trim();
+          }
+        }
+        return null;
+      }, m[1]);
+      if (read === null) return void t.check(`'${m[1]}' ${m[2]} ${m[3]}`, false, `no value labelled '${m[1]}' on the page`);
+      const num = (x: string) => Number(x.replace(/[^\d.-]/g, ''));
+      const [a, b] = [num(read), num(m[3])];
+      const numeric = /\d/.test(read) && /\d/.test(m[3]) && !Number.isNaN(a) && !Number.isNaN(b);
+      const ok = numeric
+        ? { '=': a === b, '!=': a !== b, '>': a > b, '<': a < b, '>=': a >= b, '<=': a <= b }[m[2] as '=']
+        : m[2] === '!=' ? read.toLowerCase() !== m[3].toLowerCase() : read.toLowerCase() === m[3].toLowerCase();
+      t.check(`'${m[1]}' ${m[2]} ${m[3]}`, !!ok, `shows ${read}`);
     },
   },
   {

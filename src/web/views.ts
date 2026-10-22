@@ -11,8 +11,8 @@ export const esc = (s: unknown) =>
 /** A JS string literal safe inside an HTML attribute: onsubmit="return confirm(${jsq(text)})". */
 const jsq = (s: string) => esc(JSON.stringify(s));
 
-const VERDICT_CLASS: Record<Verdict, string> = { Pass: 'pass', Fail: 'fail', Partial: 'partial', Blocked: 'blocked', Error: 'error' };
-const STATE_ICON: Record<Check['state'], string> = { pass: '✓', fail: '✗', skip: '–' };
+const VERDICT_CLASS: Record<Verdict, string> = { Pass: 'pass', Fail: 'fail', Review: 'review', Partial: 'partial', Blocked: 'blocked', Error: 'error' };
+const STATE_ICON: Record<Check['state'], string> = { pass: '✓', fail: '✗', skip: '–', review: '?' };
 
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '');
 const duration = (a?: string, b?: string) => {
@@ -50,7 +50,7 @@ export function verdictBadge(v: Verdict | string): string {
 function counts(results: CaseResult[]): string {
   const by = new Map<string, number>();
   for (const r of results) by.set(r.verdict, (by.get(r.verdict) ?? 0) + 1);
-  return ['Pass', 'Fail', 'Partial', 'Blocked', 'Error']
+  return ['Pass', 'Fail', 'Review', 'Partial', 'Blocked', 'Error']
     .filter((v) => by.get(v))
     .map((v) => `<span class="count ${VERDICT_CLASS[v as Verdict]}">${by.get(v)} ${v}</span>`)
     .join(' ');
@@ -241,7 +241,7 @@ export function suitePage(s: Suite, recent: Run[], flash?: string, ai?: { unknow
 
 function previewHtml(c: TestCase): string {
   const p = previewCase(c);
-  const item = (text: string, rule: string | null, via?: 'ai') =>
+  const item = (text: string, rule: string | null, via?: 'ai' | 'live') =>
     `<li class="${rule ? 'ok' : 'warn'}">${rule ? '✓' : '?'} ${esc(text)}${rule ? ` <span class="rule">${esc(rule)}${via ? ' · <span class="tag ai">AI rewrite, approved</span>' : ''}</span>` : ' <span class="rule">not understood: reword it (<a href="/help#writing">tips</a>) or let the AI suggest a rewrite</span>'}</li>`;
   return `<div class="preview"><b>Steps</b><ol>${p.steps.map((s) => `<li>${esc(s.sentence)}<ul>${s.clauses.map((x) => item(x.text, x.rule, x.via)).join('')}</ul></li>`).join('')}</ol>
     <b>Expected</b><ul>${p.expects.map((e) => e.claims.map((x) => item(x.text, x.rule, x.via)).join('')).join('')}</ul></div>`;
@@ -409,16 +409,19 @@ function diff(run: Run, earlier: Run[]): string {
 
 function caseDetail(run: Run, r: CaseResult): string {
   const fails = r.checks.filter((c) => c.state === 'fail');
+  const aiSteps = r.steps.filter((s) => s.via === 'ai').length;
+  const aiNotes = r.notes.filter((n) => /^AI read |the AI's corrected version|AI says /.test(n));
   return `<section class="case" id="${esc(r.tc.id)}">
-    <h3>${esc(r.tc.id)} · ${esc(r.tc.title)} ${verdictBadge(r.verdict)} <span class="sub">${(r.durationMs / 1000).toFixed(1)}s</span></h3>
+    <h3>${esc(r.tc.id)} · ${esc(r.tc.title)} ${verdictBadge(r.verdict)} <span class="sub">${(r.durationMs / 1000).toFixed(1)}s</span>${aiSteps || aiNotes.length ? ` <span class="tag ai" title="Some steps or checks were worked out by AI because the bot's rules did not cover them">AI helped</span>` : ''}</h3>
+    ${aiSteps || aiNotes.length ? `<div class="ai-box"><b>AI helped with ${aiSteps ? `${aiSteps} step${aiSteps === 1 ? '' : 's'}` : 'the checks'}.</b> <span class="sub">Its readings are saved as suggestions: approve them under <a href="/suites/${esc(run.suiteId)}/rewrites">Review rewrites</a> so the next run uses them directly, without AI.</span></div>` : ''}
     ${r.checks.length ? `<table class="checks"><thead><tr><th></th><th>Expected</th><th>Actual</th></tr></thead><tbody>${r.checks
-      .map((c) => `<tr class="${c.state}"><td>${STATE_ICON[c.state]}</td><td>${esc(c.label)}</td><td>${esc(c.actual)}${c.state === 'fail' && c.cause ? `<div class="cause">Likely cause: ${esc(c.cause)}</div>` : ''}</td></tr>`)
+      .map((c) => `<tr class="${c.state}"><td>${STATE_ICON[c.state]}</td><td>${esc(c.label)}</td><td>${esc(c.actual)}${c.state === 'fail' && c.cause ? `<div class="cause">Likely cause: ${esc(c.cause)}</div>` : c.state === 'review' && c.cause ? `<div class="cause">${esc(c.cause)}</div>` : ''}</td></tr>`)
       .join('')}</tbody></table>` : ''}
     ${r.tc.reported ? `<p class="note"><b>Reported by the tester:</b> ${esc(r.tc.reported)}</p>` : ''}
     ${r.notes.map((n) => `<p class="note">${esc(n)}</p>`).join('')}
     ${r.error ? `<p class="alert">Bot error (not a finding about the app): ${esc(r.error)}</p>` : ''}
     <details><summary>Steps the bot ran (${r.steps.length})</summary><ol class="steps">${r.steps
-      .map((s) => `<li class="${s.status}">${esc(s.text)}${s.detail ? ` <span class="sub">— ${esc(s.detail)}</span>` : ''}</li>`)
+      .map((s) => `<li class="${s.status}">${esc(s.text)}${s.via === 'ai' ? ' <span class="tag ai">AI</span>' : s.via === 'approved' ? ' <span class="tag ai">approved rewrite</span>' : ''}${s.detail ? ` <span class="sub">— ${esc(s.detail)}</span>` : ''}</li>`)
       .join('')}</ol></details>
     ${r.inspection ? `<details><summary>Page health${r.inspection.consoleErrors.length + r.inspection.failedRequests.length ? ` — ${r.inspection.consoleErrors.length} console error(s), ${r.inspection.failedRequests.length} failed request(s)` : ' — no errors'}</summary><pre>${esc([
       `${r.inspection.url} → ${r.inspection.finalUrl} · HTTP ${r.inspection.status ?? '—'} · ${(r.inspection.loadMs / 1000).toFixed(1)}s`,
@@ -553,7 +556,7 @@ export function helpPage(): string {
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
       <a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI rewrites for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -613,6 +616,7 @@ export function helpPage(): string {
       <table><tbody>
         <tr><td>${verdictBadge('Pass')}</td><td>Everything in Expected Result was checked and is correct.</td></tr>
         <tr><td>${verdictBadge('Fail')}</td><td><b>Something is wrong on the site.</b> These are the problems to fix.</td></tr>
+        <tr><td>${verdictBadge('Review')}</td><td><b>Look at this one.</b> A check the AI wrote did not hold. It may be a real bug, or the AI may have misread the sentence. Open the screenshot, then either report the bug or correct the check under <i>Review rewrites</i>.</td></tr>
         <tr><td>${verdictBadge('Partial')}</td><td>Everything the bot could check was correct, but some points couldn't be checked. The reason is shown; check those yourself.</td></tr>
         <tr><td>${verdictBadge('Blocked')}</td><td>The check needs something that doesn't exist, such as a staff account or an empty store.</td></tr>
         <tr><td>${verdictBadge('Error')}</td><td>The robot itself had a problem. This is not a problem with the site; try again.</td></tr>
@@ -717,16 +721,17 @@ export function helpPage(): string {
       <p><b>Checked by hand, on purpose.</b> The bot never presses <b>Generate</b> in <i>Write with AI</i>, because each use is charged to the store wallet. It doesn't test two browser tabs editing the same product, or logging out mid-save. New products take a while to appear on the storefront, so storefront checks on a just-saved product are marked <b>not checked</b>, not failed.</p>
     </section>
 
-    <section id="ai"><h2>AI rewrites for anything else</h2>
-      <p>The bot has fixed rules for the pages it has been taught. On other pages, many sentences show <b>?</b> (not understood). For those, SL QA can ask an AI to <b>rewrite</b> each sentence into simple steps the bot already knows. You check every rewrite before anything runs.</p>
+    <section id="ai"><h2>AI help for anything else</h2>
+      <p>The bot has built-in rules for the pages it knows well. For everything else it gets help from an AI, <b>automatically, during the run</b>:</p>
       <ol>
-        <li>On a suite with sentences that aren't understood, a box says <i>"N sentences the bot does not understand yet"</i>. Click <b>✨ Ask AI to suggest rewrites</b>.</li>
-        <li>Open <b>Review rewrites</b>. Each card shows the original sentence and the AI's version, for example:<br>
-          <code>"Open the product's detail page from Quick view"</code> → <code>GO TO '/dashboard/products'</code> · <code>CLICK 'Quick view'</code> · <code>CLICK 'View full details'</code></li>
-        <li>Edit the lines if needed, then <b>Approve</b> (or <b>Reject</b>). An empty rewrite means "cannot be automated" (for example, it needs a barcode scanner). Approving it marks the sentence as <b>not checked</b> with that reason.</li>
-        <li>Run the suite. Approved rewrites show as <span class="tag ai">AI rewrite, approved</span> in <i>How the bot reads it</i> and in the report.</li>
+        <li><b>A sentence it doesn't understand:</b> the AI reads it together with the case's title, preconditions, test data and <i>what is on the screen right now</i>, and turns it into simple steps. The bot does them straight away.</li>
+        <li><b>A step that fails on the page</b> (button not found, dialog not open, renamed label): the AI looks at the page and suggests a corrected step, and the bot tries it. The report keeps the original problem visible as "not checked", so a renamed button is never hidden.</li>
+        <li><b>An expected result it doesn't understand:</b> the AI turns it into checks the bot can measure (text shown, button visible, a number next to a label). It opens the tab the check is about first.</li>
       </ol>
-      <div class="tip"><b>Why this is safe.</b> The AI only translates sentences. It never clicks anything and never decides whether a test passed; the bot's own checks do that. Nothing runs until you approve it. Approved rewrites are saved and reused by every suite, so each sentence needs the AI only once, and runs stay repeatable.</div>
+      <p>In the results, these steps carry an <span class="tag ai">AI</span> badge, and the case says <span class="tag ai">AI helped</span>. Pass and Fail are always decided by the bot's own checks, never by the AI.</p>
+      <div class="tip"><b>Make it faster and repeatable.</b> Everything the AI worked out is saved as a suggestion. Open <b>Review rewrites</b> on the suite, check it, and click <b>Approve</b>. From then on the bot uses it directly, with no AI call, and gets the same result every time.</div>
+      <p><b>Safety.</b> When AI-driven steps would change a product (price, stock, status, channels), the bot first makes its own test product, <code>BTB &lt;case&gt; AI test item</code>, uses only that, and archives it afterwards. Real products are not touched. The AI is not used at all when no AI key is set.</p>
+      <p class="sub">Limits per case: at most 12 AI calls for steps and 12 for checks (<code>AI_MAX_CALLS_PER_CASE</code>). To switch live help off but keep the review page, set <code>AI_LIVE=off</code>.</p>
       <h3>The step language</h3>
       ${ACTION_HELP}
       <h3 id="ai-keys">AI keys: free first, paid only as a backup</h3>
@@ -959,6 +964,7 @@ button.primary { background:var(--brand); border-color:var(--brand); color:#fff;
 .or { color:var(--muted); font-size:12px; text-align:center; } .hint { color:var(--muted); font-size:12.5px; margin:0; }
 .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 0; } form.inline { display:flex; gap:6px; align-items:center; margin:0; }
 .badge { display:inline-flex; align-items:center; gap:6px; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; color:#fff; background:var(--muted); white-space:nowrap; }
+.badge.review { background:#b45309; } .count.review { color:#b45309; } tr.review td { color:#92400e; }
 .badge.pass { background:var(--pass); } .badge.fail { background:var(--fail); } .badge.partial { background:var(--partial); } .badge.blocked { background:var(--blocked); } .badge.error { background:var(--error); } .badge.running { background:var(--running); } .badge.muted { background:var(--muted); }
 .count { font-size:12px; font-weight:600; margin-right:6px; } .count.pass { color:var(--pass); } .count.fail { color:var(--fail); } .count.partial { color:var(--partial); } .count.blocked { color:var(--blocked); } .count.error { color:var(--error); }
 .alert { background:color-mix(in srgb, var(--fail) 12%, var(--card)); border:1px solid color-mix(in srgb, var(--fail) 40%, var(--line)); padding:10px 14px; border-radius:6px; margin:12px 0; }
@@ -986,6 +992,7 @@ pre { white-space:pre-wrap; font-size:12px; background:var(--bg); padding:10px; 
 textarea { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); resize:vertical; }
 pre.jira { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:12.5px; max-width:100%; overflow-wrap:anywhere; }
 .ai-banner { display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; border-color:color-mix(in srgb, var(--link) 35%, var(--line)); }
+.ai-box { margin:6px 0 10px; padding:8px 12px; border-radius:8px; background:color-mix(in srgb, var(--link) 8%, transparent); border:1px solid color-mix(in srgb, var(--link) 25%, var(--line)); }
 .rewrite { max-width:860px; } .rewrite .source { font-size:15px; margin:4px 0; } .rewrite textarea { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
 .rewrite-head { display:flex; gap:10px; align-items:center; flex-wrap:wrap; } .tag.ai { background:color-mix(in srgb, var(--link) 15%, transparent); }
 .issue-form { max-width:760px; } .issue-form details.paste { border:1px dashed var(--line); border-radius:8px; padding:10px 12px; background:var(--bg); } .issue-form details.paste summary { cursor:pointer; } .issue-form .hint { font-weight:400; } .req { color:var(--fail); font-size:11px; font-weight:500; } .opt { color:var(--muted); font-size:11px; font-weight:400; }

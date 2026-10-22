@@ -62,7 +62,9 @@ export async function inspectPage(t: CaseContext, url: string): Promise<Inspecti
 
   const target = absoluteUrl(url);
   const t0 = Date.now();
-  const response = await page.goto(target, { waitUntil: 'networkidle', timeout: 45_000 }).catch(() => null);
+  // Wait for the page to load, then give its network up to 15s to go quiet (live updates may never stop).
+  const response = await page.goto(target, { waitUntil: 'load', timeout: 45_000 }).catch(() => null);
+  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
   const loadMs = Date.now() - t0;
   // Client-rendered pages often show their data a moment after the network goes quiet.
   await page.waitForTimeout(1500);

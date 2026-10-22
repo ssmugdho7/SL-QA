@@ -5,9 +5,9 @@ import type { CaseResult, Check, Verdict } from './context.js';
 import { healthProblems, type Inspection } from './inspect.js';
 
 export const ICON: Record<Verdict, string> = {
-  Pass: '✅', Fail: '❌', Partial: '🟡', Blocked: '⛔', Error: '💥',
+  Pass: '✅', Fail: '❌', Review: '🔍', Partial: '🟡', Blocked: '⛔', Error: '💥',
 };
-const STATE_ICON = { pass: '✅', fail: '❌', skip: '⏭️' } as const;
+const STATE_ICON = { pass: '✅', fail: '❌', skip: '⏭️', review: '🔍' } as const;
 
 const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
 
@@ -22,12 +22,12 @@ export function writeReport(results: CaseResult[], runDir: string, source: strin
   out.push(`- **Target:** ${config.baseUrl}${pagePath}`);
   out.push(`- **Test cases:** ${/^https?:/.test(source) ? `[Google Sheet](${source})` : source} (${results.length} run)`);
   out.push(`- **Result:** ${[...counts].map(([v, n]) => `${ICON[v]} ${n} ${v}`).join(' · ')}`, '');
-  out.push('Verdicts: **Pass** every expectation met · **Fail** at least one expectation not met · **Partial** everything checked passed, some parts could not be checked · **Blocked** the setup it needs is missing · **Error** the bot itself broke (not a finding about the app).', '');
+  out.push('Verdicts: **Pass** every expectation met · **Fail** at least one expectation not met · **Review** a check written by AI did not hold, so a person should look (real bug or misread sentence) · **Partial** everything checked passed, some parts could not be checked · **Blocked** the setup it needs is missing · **Error** the bot itself broke (not a finding about the app).', '');
 
   out.push('## Summary', '');
   out.push('| ID | Test case | Priority | Verdict | Main finding |', '|---|---|---|---|---|');
   for (const r of results) {
-    const firstFail = r.checks.find((c) => c.state === 'fail');
+    const firstFail = r.checks.find((c) => c.state === 'fail') ?? r.checks.find((c) => c.state === 'review');
     const finding = firstFail ? `${firstFail.label}: ${firstFail.actual}` : r.verdict === 'Blocked' ? r.notes.at(-1) ?? '' : r.error ?? '';
     out.push(`| [${r.tc.id}](#${anchor(r.tc.id)}) | ${esc(r.tc.title)} | ${r.tc.priority} | ${ICON[r.verdict]} ${r.verdict} | ${esc(finding).slice(0, 160)} |`);
   }
@@ -38,6 +38,17 @@ export function writeReport(results: CaseResult[], runDir: string, source: strin
     out.push('## Findings', '');
     out.push('What went wrong, row by row: what the sheet expected, what the page actually did, and where to look.', '');
     for (const r of failed) out.push(...finding(r));
+  }
+
+  const toReview = results.filter((r) => r.verdict === 'Review');
+  if (toReview.length) {
+    out.push('## To review', '');
+    out.push('Checks the AI wrote from the sentence did not hold. Each could be a real bug or a misreading: look at the screenshot, then report the bug or correct the check under Review rewrites.', '');
+    for (const r of toReview) {
+      out.push(`- **[${r.tc.id}](#${anchor(r.tc.id)})** ${esc(r.tc.title)}`);
+      for (const c of r.checks.filter((x) => x.state === 'review')) out.push(`  - ${esc(c.label)}: ${esc(c.actual)}`);
+    }
+    out.push('');
   }
 
   const problems = (r: CaseResult) => (r.inspection ? healthProblems(r.inspection, { appOnly: true }).filter((p) => !/slow request/.test(p)) : []);
@@ -148,7 +159,7 @@ function caseSection(r: CaseResult): string[] {
   if (r.inspection) out.push(...healthSection(r.inspection));
   if (r.steps.length) {
     out.push('<details><summary>Steps the bot ran</summary>', '');
-    for (const s of r.steps) out.push(`- ${s.status === 'done' ? '✓' : s.status === 'failed' ? '✗' : s.status === 'unmatched' ? '?' : '–'} ${s.text}${s.detail ? ` — ${s.detail}` : ''}`);
+    for (const s of r.steps) out.push(`- ${s.status === 'done' ? '✓' : s.status === 'failed' ? '✗' : s.status === 'unmatched' ? '?' : '–'} ${s.text}${s.via === 'ai' ? ' *(AI)*' : ''}${s.detail ? ` — ${s.detail}` : ''}`);
     out.push('', '</details>', '');
   }
   if (r.checks.length) {

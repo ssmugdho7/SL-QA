@@ -70,7 +70,8 @@ export class Ui {
 
   /** Opens a dashboard path. List pages are switched to List view so rows can be read. */
   async goto(path: string, opts: { waitForList?: boolean } = {}): Promise<void> {
-    await this.page.goto(/^https?:/i.test(path) ? path : `${config.baseUrl}${path}`, { waitUntil: 'networkidle' }).catch(() => undefined);
+    await this.page.goto(/^https?:/i.test(path) ? path : `${config.baseUrl}${path}`, { waitUntil: 'load', timeout: 45_000 }).catch(() => undefined);
+    await this.page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => undefined);
     if (opts.waitForList === false) return;
     // Pages without a list (POS, dashboard home) never show "Showing x–y of z"; don't wait long for it there.
     const listPage = /\/dashboard\/(?:products|orders|customers|coupons|inventory)(?:[/?#]|$)/.test(path) && !/\/(?:detail|new|edit)\b/.test(path);

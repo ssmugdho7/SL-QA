@@ -208,15 +208,19 @@ function classify(status: number, message: string): AiError['kind'] {
   return 'server';
 }
 
-async function post(url: string, headers: Record<string, string>, body: unknown): Promise<{ status: number; json: any }> {
+/** Free tiers sometimes queue a request for minutes; give up quickly and use the next provider instead. */
+const TIMEOUT_MS = { free: 20_000, paid: 45_000 };
+
+async function post(url: string, headers: Record<string, string>, body: unknown, timeoutMs = TIMEOUT_MS.paid): Promise<{ status: number; json: any }> {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 45_000);
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body), signal: ctl.signal });
     const json = await res.json().catch(() => ({}));
     return { status: res.status, json };
   } catch (e) {
-    throw new AiError(`network error: ${(e as Error).message}`, 'network');
+    const slow = (e as Error).name === 'AbortError';
+    throw new AiError(slow ? `no answer within ${Math.round(timeoutMs / 1000)}s (busy)` : `network error: ${(e as Error).message}`, slow ? 'server' : 'network');
   } finally {
     clearTimeout(timer);
   }
@@ -226,7 +230,7 @@ async function callOpenAICompatible(p: Provider, key: string, model: string, sys
   const body: Record<string, unknown> = { model, temperature: 0, max_tokens: 700, messages: [{ role: 'system', content: system }, { role: 'user', content: user }] };
   if (p.jsonMode) body.response_format = { type: 'json_object' };
   Object.assign(body, p.extraBody ?? {});
-  const { status, json } = await post(`${p.baseUrl}/chat/completions`, { authorization: `Bearer ${key}`, ...(p.extraHeaders ?? {}) }, body);
+  const { status, json } = await post(`${p.baseUrl}/chat/completions`, { authorization: `Bearer ${key}`, ...(p.extraHeaders ?? {}) }, body, TIMEOUT_MS[p.tier]);
   const err = Array.isArray(json) ? json[0]?.error : json?.error;
   const msg = String(err?.message ?? json?.message ?? '');
   if (status >= 300) throw new AiError(`${p.name} ${status}: ${msg || 'request failed'}`, classify(status, msg));
@@ -236,7 +240,7 @@ async function callOpenAICompatible(p: Provider, key: string, model: string, sys
 }
 
 async function callAnthropic(p: Provider, key: string, model: string, system: string, user: string): Promise<string> {
-  const { status, json } = await post(`${p.baseUrl}/messages`, { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, { model, max_tokens: 700, temperature: 0, system, messages: [{ role: 'user', content: user }] });
+  const { status, json } = await post(`${p.baseUrl}/messages`, { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, { model, max_tokens: 700, temperature: 0, system, messages: [{ role: 'user', content: user }] }, TIMEOUT_MS[p.tier]);
   const msg = String(json?.error?.message ?? '');
   if (status >= 300) throw new AiError(`${p.name} ${status}: ${msg || 'request failed'}`, classify(status, msg));
   const text = (json?.content ?? []).filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('');

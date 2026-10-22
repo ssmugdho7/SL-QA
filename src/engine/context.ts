@@ -8,8 +8,9 @@ import type { TestCase } from './sources/cases.js';
 import type { Inspection } from './inspect.js';
 import { Ui, type Snap } from './ui.js';
 
-export type CheckState = 'pass' | 'fail' | 'skip';
-export type Verdict = 'Pass' | 'Fail' | 'Partial' | 'Blocked' | 'Error';
+/** 'review': an AI-written check that did not pass. It may be a real bug or a wrong reading by the AI, so a person decides. */
+export type CheckState = 'pass' | 'fail' | 'skip' | 'review';
+export type Verdict = 'Pass' | 'Fail' | 'Review' | 'Partial' | 'Blocked' | 'Error';
 
 export interface Check {
   label: string;
@@ -37,7 +38,7 @@ export interface State {
 
 export interface Shot { after: string; kind: string; state: State; snap: Snap; extra?: Record<string, unknown> }
 
-export interface StepLog { text: string; status: 'done' | 'failed' | 'unmatched' | 'skipped'; detail?: string }
+export interface StepLog { text: string; status: 'done' | 'failed' | 'unmatched' | 'skipped'; detail?: string; /** How the bot understood it: its own rules, an approved rewrite, or live AI help. */ via?: 'rules' | 'approved' | 'ai' }
 
 export interface CaseResult {
   tc: TestCase;
@@ -252,6 +253,8 @@ export class CaseContext {
 
 export function verdictFrom(checks: Check[]): Verdict {
   if (checks.some((c) => c.state === 'fail')) return 'Fail';
+  // Only AI-written checks disagreed with the page: a person should look before calling it a bug.
+  if (checks.some((c) => c.state === 'review')) return 'Review';
   if (!checks.some((c) => c.state === 'pass')) return 'Blocked';
   return checks.some((c) => c.state === 'skip') ? 'Partial' : 'Pass';
 }

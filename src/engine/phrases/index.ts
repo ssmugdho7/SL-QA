@@ -9,6 +9,7 @@ import { FORM_EXPECT_RULES } from './form-expects.js';
 import { ALL_STEP_RULES } from './natural.js';
 import { ACTION_EXPECTS, ACTION_RULES } from './actions.js';
 import { approved, type Kind } from '../ai/translate.js';
+import { liveEnabled, prepareAiProduct, recoverStep, understandExpect, understandStep } from '../ai/assist.js';
 import { fallbackCheck, fallbackKind } from './fallback.js';
 import { applyFixtures, planFixtures } from './fixtures.js';
 import { expectClauses, stepClauses } from './split.js';
@@ -16,7 +17,7 @@ import type { StepRule } from './steps.js';
 
 /** How the engine reads one test case, without running it. Shown in the UI so testers can fix wording before a run. */
 export interface Preview {
-  steps: { sentence: string; clauses: { text: string; rule: string | null; via?: 'ai' }[] }[];
+  steps: { sentence: string; clauses: { text: string; rule: string | null; via?: 'ai' | 'live' }[] }[];
   expects: { sentence: string; claims: { text: string; rule: string | null; via?: 'ai' }[] }[];
   understood: number;
   total: number;
@@ -46,8 +47,8 @@ export function aboutProductForm(tc: TestCase): boolean {
   return /'add product'|add product button|'save product'|click 'edit' on|edit page|^edit a (?:variable |simple )?product|products\/(?:new|.*edit)/im.test([...tc.steps, tc.url].join('\n'));
 }
 
-function resolveClauses(sentence: string, form = false): { text: string; rule: StepRule | null; via?: 'ai' }[] {
-  const out: { text: string; rule: StepRule | null; via?: 'ai' }[] = [];
+function resolveClauses(sentence: string, form = false): { text: string; rule: StepRule | null; via?: 'ai' | 'live' }[] {
+  const out: { text: string; rule: StepRule | null; via?: 'ai' | 'live' }[] = [];
   // Specific rules know the app (fixtures, waits, confirmations); the generic actions come after them.
   const rules = [...(form ? ALL_STEP_RULES : ALL_STEP_RULES.filter((r) => !r.formOnly)), ...ACTION_RULES];
   // On the product form, a whole sentence a form rule understands ("Enter each invalid value … in A, B and C") stays one step.
@@ -96,6 +97,11 @@ function resolveClauses(sentence: string, form = false): { text: string; rule: S
   return out;
 }
 
+/** A step line inside an expected-result rewrite (open the tab the check is about); it records no check itself. */
+function SHOW(step: StepRule): ExpectRule {
+  return { name: 'show first', pattern: step.pattern, check: async (t, m, claim) => { await step.run(t, m, claim); } };
+}
+
 /** A reviewed "cannot be automated" answer: the step is noted, not failed. */
 function SKIPPED(note: string): StepRule {
   return { name: 'not automated (reviewed)', pattern: /[\s\S]*/, run: async (t) => { t.note(note || 'Marked as not automatable when the AI suggestion was reviewed.'); return note || 'Not automated.'; } };
@@ -119,14 +125,30 @@ function resolveClaims(sentence: string, form: boolean): { text: string; rule: s
     const rule = expectRule(c, form);
     if (rule) return [{ text: c, rule: rule.name, check: rule }];
     const r = rewrite('expect', c);
-    if (r?.lines.length) return r.lines.filter((l) => l.expect).map((l) => ({ text: l.text, rule: l.expect!.name, check: l.expect, via: 'ai' as const }));
+    if (r?.lines.length) return r.lines.map((l) => (l.expect
+      ? { text: l.text, rule: l.expect.name, check: l.expect, via: 'ai' as const }
+      : { text: l.text, rule: 'show first', check: SHOW(l.step!), via: 'ai' as const }));
     if (r) return [{ text: c, rule: 'not automated (reviewed)', via: 'ai' as const, reviewedNote: r.note }];
     return [{ text: c, rule: fallbackKind(c) }];
   });
 }
 
-/** Runs one test case: prepare data → run each step (snapshot after each) → check each expected result. */
+/** A case that runs longer than this is stopped and reported as a bot error, so one stuck page cannot hold up a run. */
+const CASE_TIMEOUT_MS = Number(process.env.CASE_TIMEOUT_SECONDS ?? 600) * 1000;
+
+/** Runs one test case with a time limit (see CASE_TIMEOUT_MS). */
 export async function runCase(tc: TestCase, session: Session, runDir: string, startPath: string, onStep?: (text: string) => void): Promise<CaseResult> {
+  const started = Date.now();
+  let lastStep = '';
+  const work = runCaseInner(tc, session, runDir, startPath, (x) => { lastStep = x; onStep?.(x); });
+  return withTimeout(work, CASE_TIMEOUT_MS, 'case').catch((e) => ({
+    tc, verdict: 'Error' as const, checks: [], steps: [], notes: [`Stopped after ${Math.round(CASE_TIMEOUT_MS / 1000)}s at: ${lastStep}`], screenshots: [],
+    consoleErrors: [], failedRequests: [], error: (e as Error).message, durationMs: Date.now() - started,
+  }));
+}
+
+/** Runs one test case: prepare data → run each step (snapshot after each) → check each expected result. */
+async function runCaseInner(tc: TestCase, session: Session, runDir: string, startPath: string, onStep?: (text: string) => void): Promise<CaseResult> {
   const started = Date.now();
   // A row's own URL wins over the suite's start page.
   startPath = tc.url || startPath;
@@ -135,22 +157,45 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
   try {
     await t.init();
     onStep?.(`Inspecting ${startPath}`);
-    t.inspection = await inspectPage(t, startPath).catch((e) => {
+    // The page check is evidence, not the test: never let a slow page hold the case up for long.
+    t.inspection = await withTimeout(inspectPage(t, startPath), 90_000, 'page check').catch((e) => {
       t.note(`Could not inspect the page: ${(e as Error).message.split('\n')[0]}`);
       return undefined;
     });
     const plan = planFixtures(t);
     t.noted.set('__values', plan.values);
     await applyFixtures(t, plan);
+    // When AI help may drive steps that change a product, create its test product now, before the page loads.
+    const form = aboutProductForm(tc);
+    if (liveEnabled() && tc.steps.some((s) => resolveClauses(s, form).some((c) => !c.rule))) await prepareAiProduct(t);
     await t.ui.goto(startPath);
     await t.snap('start', 'initial');
 
-    const clauses = tc.steps.flatMap((sentence) => resolveClauses(sentence, aboutProductForm(tc)));
-    for (const [i, clause] of clauses.entries()) {
-      {
+    // Steps are grouped by sentence, so live AI help can read a whole sentence it does not understand.
+    const groups = tc.steps.map((sentence) => ({ sentence: sentence.trim().replace(/\.$/, ''), clauses: resolveClauses(sentence, form) }));
+    let stop = false;
+    for (const [gi, g] of groups.entries()) {
+      if (stop) break;
+      // Rules missed part of the sentence: ask the AI for the whole sentence once, and run its lines instead.
+      if (g.clauses.some((c) => !c.rule) && liveEnabled()) {
+        onStep?.(`Asking AI: ${g.sentence}`);
+        const ai = await understandStep(t, g.sentence);
+        if (ai?.lines.length) {
+          g.clauses = ai.lines.map((l) => ({ text: l.text, rule: l.rule, via: 'live' as const }));
+          t.note(`AI read "${g.sentence}" as: ${ai.lines.map((l) => l.text).join(' → ')} (${ai.model}). Approve it under Review rewrites to reuse it without AI.`);
+        } else if (ai && !ai.lines.length) {
+          t.steps.push({ text: g.sentence, status: 'skipped', detail: `AI: ${ai.note || 'cannot be done by the robot'}`, via: 'ai' });
+          t.note(`AI says "${g.sentence}" cannot be done by the robot: ${ai.note || 'no reason given'}.`);
+          continue;
+        }
+      }
+      for (const [ci, clause] of g.clauses.entries()) {
         onStep?.(clause.text);
-        t.noted.set('__next', clauses[i + 1]?.text ?? '');
+        const next = g.clauses[ci + 1]?.text ?? groups[gi + 1]?.clauses[0]?.text ?? '';
+        t.noted.set('__next', next);
         const rule = clause.rule;
+        const via = clause.via === 'ai' ? 'approved' : clause.via === 'live' ? 'ai' : 'rules';
+        const label = clause.via === 'ai' ? `${clause.text} (AI rewrite, approved)` : clause.via === 'live' ? `${clause.text} (AI)` : clause.text;
         if (!rule) {
           // Keep going: the remaining steps and the expected results are still checked against the page.
           t.steps.push({ text: clause.text, status: 'unmatched', detail: 'not understood, skipped' });
@@ -159,16 +204,62 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
         }
         try {
           const detail = await rule.run(t, clause.text.match(rule.pattern)!, clause.text);
-          t.steps.push({ text: clause.via === 'ai' ? `${clause.text} (AI rewrite, approved)` : clause.text, status: 'done', detail: detail || undefined });
+          t.steps.push({ text: label, status: 'done', detail: detail || undefined, via });
         } catch (e) {
           if (e instanceof Blocked) {
-            t.steps.push({ text: clause.text, status: 'skipped', detail: e.message });
+            t.steps.push({ text: label, status: 'skipped', detail: e.message, via });
             if (!e.soft) throw e;
             t.note(e.message);
+            stop = true;
             break;
           }
           const msg = e instanceof Missing ? e.message : (e as Error).message.split('\n')[0];
-          t.steps.push({ text: clause.text, status: 'failed', detail: msg });
+          // The step failed on the page: let the AI look at what is there and try a corrected version.
+          // The same wrong name can recur in later AI lines ("open the dialog again"); reuse the fix that worked.
+          const learned = (t.noted.get('__aiFixes') as Map<string, { text: string; rule: StepRule }[]> | undefined)?.get(clause.text);
+          if (learned) {
+            let ok = true;
+            for (const l of learned) await l.rule.run(t, l.text.match(l.rule.pattern)!, l.text).catch(() => { ok = false; });
+            if (ok) {
+              t.steps.push({ text: label, status: 'done', detail: `Same fix as earlier: ${learned.map((l) => l.text).join(' → ')}`, via: 'ai' });
+              await t.snap(clause.text);
+              continue;
+            }
+          }
+          if (liveEnabled() && !t.noted.get(`__recovered:${clause.text}`)) {
+            t.noted.set(`__recovered:${clause.text}`, true);
+            onStep?.(`Step failed, asking AI: ${clause.text}`);
+            // Repair just this action (with the sentence it came from as context), not the whole sentence again.
+            const rest = g.clauses.slice(ci + 1).map((c) => c.text);
+            const fix = await recoverStep(t, clause.text, msg, { sentence: g.sentence, later: rest });
+            if (fix?.lines.length) {
+              const done: string[] = [];
+              let fixed = true;
+              for (const l of fix.lines) {
+                try {
+                  await l.rule.run(t, l.text.match(l.rule.pattern)!, l.text);
+                  done.push(l.text);
+                } catch (e2) {
+                  fixed = false;
+                  t.note(`AI's corrected step "${l.text}" also failed: ${(e2 as Error).message.split('\n')[0].slice(0, 140)}`);
+                  break;
+                }
+              }
+              if (fixed) {
+                const fixes = (t.noted.get('__aiFixes') as Map<string, { text: string; rule: StepRule }[]> | undefined) ?? new Map();
+                fixes.set(clause.text, fix.lines);
+                t.noted.set('__aiFixes', fixes);
+                const why = msg.split('(found:')[0].trim();
+                t.steps.push({ text: label, status: 'done', detail: `As written it failed (${why.slice(0, 120)}); the AI did instead: ${done.join(' → ')}`, via: 'ai' });
+                t.note(`"${clause.text}" failed as written; the AI's corrected version worked: ${done.join(' → ')} (${fix.model}).`);
+                // Not a pass for the step as written: a person decides whether the sheet's wording or the app is wrong.
+                t.skip(`Step as written: "${clause.text}"`, `${why}. The AI continued with: ${done.join(' → ')}. If the sheet is right, this is a finding (for example a renamed or missing button); otherwise update the step.`);
+                await t.snap(clause.text);
+                continue;
+              }
+            }
+          }
+          t.steps.push({ text: label, status: 'failed', detail: msg, via });
           await t.shot('step failed');
           // A control named in the sheet that is missing from the page is a finding, not a bot error.
           if (e instanceof Missing) {
@@ -191,7 +282,30 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
           continue;
         }
         if (!rule) {
-          if (!(await fallbackCheck(t, claim).catch(() => false))) t.skip(claim, `Not understood by the bot — compare with the page by hand.${pageGist(t)}`);
+          if (await fallbackCheck(t, claim).catch(() => false)) continue;
+          const ai = liveEnabled() ? await understandExpect(t, claim) : null;
+          if (ai?.lines.length) {
+            t.note(`AI read the expected result "${claim}" as: ${ai.lines.map((l) => l.text).join(' · ')} (${ai.model}).`);
+            for (const l of ai.lines) {
+              if ('step' in l) {
+                // Show the tab / section the check is about first.
+                await l.step.run(t, l.text.match(l.step.pattern)!, l.text).catch((e) => t.note(`Could not open what "${claim}" is about (${l.text}): ${(e as Error).message.split('\n')[0].slice(0, 120)}`));
+                continue;
+              }
+              const before = t.checks.length;
+              await l.check.check(t, l.text.match(l.check.pattern)!, l.text).catch((e) => t.skip(l.text, `Could not check: ${(e as Error).message.split('\n')[0]}`));
+              for (const c of t.checks.slice(before)) {
+                c.label = `${claim} → AI checked: ${l.text.replace(/^EXPECT /, '').toLowerCase()}`;
+                // An AI-written check that does not hold may be a real bug or a misreading; a person decides.
+                if (c.state === 'fail') {
+                  c.state = 'review';
+                  c.cause = 'This check was written by AI from the sentence. Look at the screenshot: if the page is wrong, it is a bug; if the check is wrong, correct it under Review rewrites.';
+                }
+              }
+            }
+            continue;
+          }
+          t.skip(claim, ai ? `AI says this cannot be checked by the robot: ${ai.note || 'no reason given'}` : `Not understood by the bot — compare with the page by hand.${pageGist(t)}`);
           continue;
         }
         const before = t.checks.length;
@@ -201,11 +315,11 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
           if (e instanceof Blocked) t.skip(claim, e.message);
           else t.skip(claim, `Could not check: ${(e as Error).message.split('\n')[0]}`);
         }
-        if (t.checks.length === before && rule.name !== 'observation note') t.skip(claim, 'Nothing to compare (the steps did not produce what this needs).');
+        if (t.checks.length === before && rule.name !== 'observation note' && rule.name !== 'show first') t.skip(claim, 'Nothing to compare (the steps did not produce what this needs).');
       }
     }
     // Nothing could be compared: the page's own health (errors, failed requests, blank page) is the finding.
-    if (t.inspection && !t.checks.some((c) => c.state !== 'skip')) {
+    if (t.inspection && !t.checks.some((c) => c.state === 'pass' || c.state === 'fail' || c.state === 'review')) {
       const problems = healthProblems(t.inspection, { appOnly: true }).filter((p) => !/slow request/.test(p));
       t.check('Page loads without errors', !problems.length, problems.join('; ') || 'no console errors, failed app requests, error text or blank page', 'See Page health for the request or console error behind this.');
     }
@@ -226,6 +340,14 @@ export async function runCase(tc: TestCase, session: Session, runDir: string, st
 }
 
 class StepStop extends Error {}
+
+/** Rejects if `work` takes longer than `ms` (the work itself keeps running in the background and is ignored). */
+function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${what} took longer than ${Math.round(ms / 1000)}s`)), ms);
+    work.then((v) => { clearTimeout(timer); resolve(v); }, (e) => { clearTimeout(timer); reject(e); });
+  });
+}
 
 /** " Page shows: heading · heading · …" to help a person judge a claim the bot could not. */
 function pageGist(t: CaseContext): string {
