@@ -1,7 +1,7 @@
 {
   "name": "sl-qa",
   "version": "1.0.0",
-  "description": "Zero-AI QA runner for the slshop.cloud dashboard: reads test cases from a Google Sheet or CSV/XLSX, runs them in a real browser, reports what passes and fails.",
+  "description": "Rule-based QA runner for the slshop.cloud dashboard, with optional AI help (free keys first): reads test cases from a Google Sheet or CSV/XLSX, runs them in a real browser, reports what passes and fails.",
   "scripts": {
     "start": "tsx src/web/server.ts",
     "dev": "tsx watch src/web/server.ts",

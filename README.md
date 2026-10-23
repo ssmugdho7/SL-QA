@@ -2,6 +2,8 @@
 
 An in-house QA tool for the slshop.cloud dashboard. It runs on fixed rules; an AI (free keys first) helps only with sentences the rules miss or steps that fail, and never decides a verdict.
 
+Docs: [plain-English overview](docs/how-it-works-overview.md) · [technical guide](docs/how-it-works-technical.md) · [improvements and integrations](docs/improvements-and-integrations.md).
+
 Add a test sheet: a Google Sheet link, or a CSV/XLSX upload. The tool reads each test case's steps and expected results as plain sentences, runs them in a real browser against the live dashboard, and shows what passed and what failed. Each failure comes with screenshots, the likely cause and a ready-to-paste fix prompt.
 
 ## Run it
