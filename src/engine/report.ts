@@ -1,13 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 import { config } from './config.js';
-import type { CaseResult, Check, Verdict } from './context.js';
+import { aiChecked, type CaseResult, type Check, type Verdict } from './context.js';
 import { healthProblems, type Inspection } from './inspect.js';
 
 export const ICON: Record<Verdict, string> = {
   Pass: '✅', Fail: '❌', Review: '🔍', Partial: '🟡', Blocked: '⛔', Error: '💥',
 };
 const STATE_ICON = { pass: '✅', fail: '❌', skip: '⏭️', review: '🔍' } as const;
+
+/** Review only because every passing check was written by live AI (nothing failed or needs review on its own). */
+export const aiOnly = (r: CaseResult) => r.verdict === 'Review' && aiChecked(r.checks) && !r.checks.some((c) => c.state === 'review');
+const verdictText = (r: CaseResult) => `${ICON[r.verdict]} ${r.verdict}${aiOnly(r) ? ' (AI-checked)' : ''}`;
 
 const esc = (s: string) => s.replace(/\|/g, '\\|').replace(/\s*\n\s*/g, ' ');
 
@@ -22,14 +26,14 @@ export function writeReport(results: CaseResult[], runDir: string, source: strin
   out.push(`- **Target:** ${config.baseUrl}${pagePath}`);
   out.push(`- **Test cases:** ${/^https?:/.test(source) ? `[Google Sheet](${source})` : source} (${results.length} run)`);
   out.push(`- **Result:** ${[...counts].map(([v, n]) => `${ICON[v]} ${n} ${v}`).join(' · ')}`, '');
-  out.push('Verdicts: **Pass** every expectation met · **Fail** at least one expectation not met · **Review** a check written by AI did not hold, so a person should look (real bug or misread sentence) · **Partial** everything checked passed, some parts could not be checked · **Blocked** the setup it needs is missing · **Error** the bot itself broke (not a finding about the app).', '');
+  out.push('Verdicts: **Pass** every expectation met · **Fail** at least one expectation not met · **Review** a check written by AI did not hold, or every passing check was written by AI (marked *AI-checked*), so a person should look · **Partial** everything checked passed, some parts could not be checked · **Blocked** the setup it needs is missing · **Error** the bot itself broke (not a finding about the app).', '');
 
   out.push('## Summary', '');
   out.push('| ID | Test case | Priority | Verdict | Main finding |', '|---|---|---|---|---|');
   for (const r of results) {
     const firstFail = r.checks.find((c) => c.state === 'fail') ?? r.checks.find((c) => c.state === 'review');
-    const finding = firstFail ? `${firstFail.label}: ${firstFail.actual}` : r.verdict === 'Blocked' ? r.notes.at(-1) ?? '' : r.error ?? '';
-    out.push(`| [${r.tc.id}](#${anchor(r.tc.id)}) | ${esc(r.tc.title)} | ${r.tc.priority} | ${ICON[r.verdict]} ${r.verdict} | ${esc(finding).slice(0, 160)} |`);
+    const finding = firstFail ? `${firstFail.label}: ${firstFail.actual}` : r.verdict === 'Blocked' ? r.notes.at(-1) ?? '' : r.error ?? (aiOnly(r) ? 'Every passing check was written by AI; confirm it checked the right thing.' : '');
+    out.push(`| [${r.tc.id}](#${anchor(r.tc.id)}) | ${esc(r.tc.title)} | ${r.tc.priority} | ${verdictText(r)} | ${esc(finding).slice(0, 160)} |`);
   }
   out.push('');
 
@@ -43,10 +47,10 @@ export function writeReport(results: CaseResult[], runDir: string, source: strin
   const toReview = results.filter((r) => r.verdict === 'Review');
   if (toReview.length) {
     out.push('## To review', '');
-    out.push('Checks the AI wrote from the sentence did not hold. Each could be a real bug or a misreading: look at the screenshot, then report the bug or correct the check under Review rewrites.', '');
+    out.push('Checks the AI wrote from the sentence did not hold, or passed with no rule-based check to back them (*AI-checked*). Each could be a real bug, a misreading or a check of the wrong thing: look at the screenshot, then report the bug or correct the check under Review rewrites.', '');
     for (const r of toReview) {
-      out.push(`- **[${r.tc.id}](#${anchor(r.tc.id)})** ${esc(r.tc.title)}`);
-      for (const c of r.checks.filter((x) => x.state === 'review')) out.push(`  - ${esc(c.label)}: ${esc(c.actual)}`);
+      out.push(`- **[${r.tc.id}](#${anchor(r.tc.id)})** ${esc(r.tc.title)}${aiOnly(r) ? ' *(AI-checked)*' : ''}`);
+      for (const c of r.checks.filter((x) => x.state === 'review' || (aiOnly(r) && x.by === 'ai'))) out.push(`  - ${STATE_ICON[c.state]} ${esc(c.label)}: ${esc(c.actual)}`);
     }
     out.push('');
   }
@@ -153,7 +157,7 @@ function caseSection(r: CaseResult): string[] {
   const out: string[] = [];
   out.push(`<a id="${anchor(r.tc.id)}"></a>`, '', `### ${r.tc.id}`, '');
   const meta = [r.tc.scenario, r.tc.type, r.tc.priority && `${r.tc.priority} priority`].filter(Boolean);
-  out.push(`**${r.tc.title}** — ${[...meta, `${ICON[r.verdict]} **${r.verdict}**`, `${(r.durationMs / 1000).toFixed(1)}s`].join(' · ')}`, '');
+  out.push(`**${r.tc.title}** — ${[...meta, `${ICON[r.verdict]} **${r.verdict}**${aiOnly(r) ? ' *(AI-checked)*' : ''}`, `${(r.durationMs / 1000).toFixed(1)}s`].join(' · ')}`, '');
   if (r.tc.url) out.push(`**Page:** ${r.tc.url}`, '');
   if (r.tc.reported) out.push(`**Reported by the tester:** ${r.tc.reported.replace(/\n+/g, ' ')}`, '');
   if (r.inspection) out.push(...healthSection(r.inspection));
@@ -164,7 +168,7 @@ function caseSection(r: CaseResult): string[] {
   }
   if (r.checks.length) {
     out.push('| | Expected | Actual |', '|---|---|---|');
-    for (const c of r.checks) out.push(`| ${STATE_ICON[c.state]} | ${esc(c.label)} | ${esc(c.actual)} |`);
+    for (const c of r.checks) out.push(`| ${STATE_ICON[c.state]}${c.by === 'ai' ? ' AI' : ''} | ${esc(c.label)} | ${esc(c.actual)} |`);
     out.push('');
   }
   for (const n of r.notes) out.push(`> ${n}`);

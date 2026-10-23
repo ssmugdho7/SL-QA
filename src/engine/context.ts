@@ -18,6 +18,8 @@ export interface Check {
   actual: string;
   /** Hand-written likely cause, shown when the check fails. */
   cause?: string;
+  /** 'ai': written by live AI during the run (not by a rule or an approved rewrite), so a pass is not trusted alone. */
+  by?: 'ai';
 }
 
 /** Page state that steps set and expectations look back at. */
@@ -256,7 +258,15 @@ export function verdictFrom(checks: Check[]): Verdict {
   // Only AI-written checks disagreed with the page: a person should look before calling it a bug.
   if (checks.some((c) => c.state === 'review')) return 'Review';
   if (!checks.some((c) => c.state === 'pass')) return 'Blocked';
+  // Every pass came from a check the AI wrote live: it may have checked the wrong thing, so a person confirms.
+  if (aiChecked(checks)) return 'Review';
   return checks.some((c) => c.state === 'skip') ? 'Partial' : 'Pass';
+}
+
+/** True when the case has passing checks and all of them were written by live AI (no rule or approved check passed). */
+export function aiChecked(checks: Check[]): boolean {
+  const passes = checks.filter((c) => c.state === 'pass');
+  return passes.length > 0 && passes.every((c) => c.by === 'ai') && !checks.some((c) => c.state === 'fail');
 }
 
 export function newRunDir(id: string): string {

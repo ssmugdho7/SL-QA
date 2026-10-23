@@ -1,4 +1,4 @@
-import type { CaseResult, Check, Verdict } from '../engine/context.js';
+import { aiChecked, type CaseResult, type Check, type Verdict } from '../engine/context.js';
 import { previewCase } from '../engine/phrases/index.js';
 import type { TestCase } from '../engine/sources/cases.js';
 import { EXAMPLE_CASES, EXAMPLE_JIRA } from './example.js';
@@ -76,7 +76,31 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export interface SuiteForm { kind: string; name: string; url: string; pagePath: string }
 
-export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: string, typed?: SuiteForm): string {
+/** The whole-dashboard check: when the site map was made, a crawl in progress, the suite built from it. */
+export interface SiteInfo { generatedAt?: string; pages: number; stale: boolean; crawling?: { pages: number; startedAt: string }; error?: string; suiteId?: string; msg?: string }
+
+function siteCard(x: SiteInfo): string {
+  const state = x.crawling
+    ? `<p role="status"><span class="badge running"><i class="spin"></i>Crawling</span> ${plural(x.crawling.pages, 'page')} read so far, started ${duration(x.crawling.startedAt)} ago. Nothing on the store is changed.</p>`
+    : x.generatedAt
+      ? `<p class="sub">Site map: ${plural(x.pages, 'page')}, crawled ${when(x.generatedAt)}${x.stale ? ' · <span class="warn">over 7 days old, it will be crawled again</span>' : ''}.</p>`
+      : '<p class="sub">No site map yet: the first check crawls the dashboard (about 5 minutes).</p>';
+  return `<section class="card site-check" id="site">
+    <h2>🔎 Check the whole dashboard</h2>
+    <p class="hint">One case per dashboard page, no writing needed: each page should load without errors or NaN/undefined values and show its heading; its tabs, Filter panel, search box and next page are tried. Read-only: nothing is created, saved or deleted.</p>
+    ${x.msg ? `<div class="alert info" role="status">${esc(x.msg)}</div>` : ''}
+    ${x.error && !x.crawling ? `<div class="alert" role="alert">The last crawl stopped: ${esc(x.error)}</div>` : ''}
+    ${state}
+    <div class="toolbar">
+      <form method="post" action="/site" class="inline"><button class="primary"${x.crawling ? ' disabled' : ''}>${x.suiteId ? 'Update the dashboard suite' : 'Check the whole dashboard'}</button></form>
+      ${x.generatedAt ? `<form method="post" action="/site" class="inline"><input type="hidden" name="recrawl" value="1"><button${x.crawling ? ' disabled' : ''} title="Walk the dashboard again to pick up new or changed pages">↻ Re-crawl</button></form>` : ''}
+      ${x.suiteId ? `<a class="button" href="/suites/${x.suiteId}">Open the suite</a>` : ''}
+    </div>
+    ${x.crawling ? '<script>setTimeout(() => location.reload(), 4000)</script>' : ''}
+  </section>`;
+}
+
+export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: string, typed?: SuiteForm, site?: SiteInfo): string {
   const f: SuiteForm = typed ?? { kind: 'sheet', name: '', url: '', pagePath: '/dashboard/products' };
   const rows = all
     .map((s) => {
@@ -96,7 +120,8 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
   return layout(
     'Suites',
     `<div class="page-head"><div><h1>Test suites</h1><p class="sub">A suite is one list of cases (test cases or bugs) for the bot to check on slshop.cloud.</p></div>
-      <a class="button primary" href="#add">＋ New suite</a></div>
+      <div class="toolbar"><a class="button" href="#site">🔎 Check the whole dashboard</a><a class="button primary" href="#add">＋ New suite</a></div></div>
+    ${site ? siteCard(site) : ''}
     ${all.length ? wrap(`<table><thead><tr><th>Suite</th><th class="num">Cases</th><th>Understood by the bot</th><th>Last run</th></tr></thead><tbody>${rows}</tbody></table>`)
       : `<div class="empty"><b>No suites yet.</b><br>Add your first list of cases below: a Google Sheet, a file, or type them in by hand.<br><a href="/help">New here? Read How to use</a> · <a href="/help/sample.csv">Download a sample sheet</a></div>`}
     <section class="card" id="add">
@@ -137,7 +162,7 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
 }
 
 function sourceLabel(s: Suite): string {
-  return s.source.kind === 'sheet' ? 'Google Sheet' : s.source.kind === 'upload' ? 'Uploaded file' : 'Typed in by hand';
+  return s.source.kind === 'sheet' ? 'Google Sheet' : s.source.kind === 'upload' ? 'Uploaded file' : s.source.kind === 'site' ? 'Whole dashboard (site map)' : 'Typed in by hand';
 }
 
 function coverage(understood: number, total: number): string {
@@ -166,14 +191,14 @@ export function suitePage(s: Suite, recent: Run[], flash?: string, ai?: { unknow
       </tr>`;
     })
     .join('');
-  const source = s.source.kind === 'sheet' ? `<a href="${esc(s.source.url)}" target="_blank" rel="noreferrer">Google Sheet ↗</a>` : s.source.kind === 'upload' ? `Uploaded file <code>${esc(s.source.file.replace(/^\w+-/, ''))}</code>` : 'Typed in by hand';
+  const source = s.source.kind === 'sheet' ? `<a href="${esc(s.source.url)}" target="_blank" rel="noreferrer">Google Sheet ↗</a>` : s.source.kind === 'upload' ? `Uploaded file <code>${esc(s.source.file.replace(/^\w+-/, ''))}</code>` : s.source.kind === 'site' ? `One read-only case per dashboard page, crawled ${when(s.syncedAt)} (<a href="/#site">re-crawl</a>)` : 'Typed in by hand';
   const manualCount = s.cases.filter((c) => c.manual).length;
   const n = s.cases.length;
   return layout(
     s.name,
     `<p class="crumbs"><a href="/">Suites</a> /</p>
     <div class="page-head"><div><h1>${esc(s.name)}</h1>
-      <p class="sub">${[source, `starts on <code>${esc(s.pagePath)}</code>`, plural(n, 'case'), s.source.kind === 'sheet' ? `read ${when(s.syncedAt)}` : ''].filter(Boolean).join(' · ')}</p></div></div>
+      <p class="sub">${[source, s.source.kind === 'site' ? '' : `starts on <code>${esc(s.pagePath)}</code>`, plural(n, 'case'), s.source.kind === 'sheet' ? `read ${when(s.syncedAt)}` : ''].filter(Boolean).join(' · ')}</p></div></div>
     ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
     ${ai ? rewriteBanner(s, ai.unknown, ai.pending, ai.provider) : ''}
     ${n ? `<div class="toolbar">
@@ -183,6 +208,7 @@ export function suitePage(s: Suite, recent: Run[], flash?: string, ai?: { unknow
       </form>
       <a class="button" href="/suites/${s.id}/issues/new">＋ Add case</a>
       ${s.source.kind === 'sheet' ? `<form method="post" action="/suites/${s.id}/sync" class="inline"><button title="Download the sheet again and pick up changes">↻ Re-read sheet</button></form>` : ''}
+      ${s.source.kind === 'site' ? `<form method="post" action="/suites/${s.id}/sync" class="inline"><button title="Rebuild the cases from the latest site map">↻ Rebuild from site map</button></form>` : ''}
     </div>
     <div class="selection-bar">
       <span id="sel-count" class="sub" aria-live="polite"></span>
@@ -337,7 +363,13 @@ export const ACTION_HELP = `<table class="stack-sm"><thead><tr><th>Line</th><th>
   <tr><td><code>EXPECT MESSAGE 'required'</code> · <code>EXPECT URL '/dashboard/products'</code></td><td>A pop-up message; the page address.</td></tr>
   <tr><td><code>EXPECT BUTTON 'Save' DISABLED</code> · <code>EXPECT FIELD 'Price' = '100'</code> · <code>EXPECT COUNT 'Showing 1–1 of 1'</code></td><td>Button state, a field's value, a count.</td></tr>
   <tr><td><code>EXPECT VALUE 'On Hand' = '13'</code> · <code>EXPECT VALUE 'Total' &gt; '0'</code></td><td>The number or text shown next to a label (cards, detail rows, totals). Also <code>!=</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code>.</td></tr>
-</tbody></table><p class="sub">You can also type these lines straight into a sheet or the Add case form; the bot understands them without AI.</p>`;
+  <tr><td><code>REMEMBER VALUE 'On Hand' AS stock</code> · <code>REMEMBER COUNT AS n</code></td><td>Reads a value (or the list total) before the steps, for a before/after check.</td></tr>
+  <tr><td><code>EXPECT VALUE 'On Hand' = stock + 5</code> · <code>EXPECT VALUE 'Total' &gt; sales</code> · <code>EXPECT VALUE 'Total' CHANGED</code></td><td>Compares with a remembered value. Also <code>- 2</code>, <code>UNCHANGED</code>.</td></tr>
+  <tr><td><code>EXPECT COUNT = n + 1</code> · <code>EXPECT COUNT &lt; n</code> · <code>EXPECT COUNT UNCHANGED</code></td><td>The list total ("Showing x–y of z") compared with a remembered count.</td></tr>
+  <tr><td><code>EXPECT ROW 'BTB Shirt'</code> · <code>EXPECT NO ROW 'BTB Shirt'</code> · <code>EXPECT TEXT 'Paid' IN 'ORD-1001'</code></td><td>A list row or card with that text; text inside one row, dialog or section.</td></tr>
+  <tr><td><code>WAIT FOR TEXT 'Saved' 10</code> · <code>WAIT FOR URL '/dashboard/orders'</code> · <code>RELOAD</code> · <code>GO BACK</code></td><td>Waits up to N seconds (default 10); reloads; goes back.</td></tr>
+  <tr><td><code>HOVER 'Info'</code> · <code>SCROLL TO 'Footer'</code> · <code>TYPE 'Red' INTO 'Name' IN 'Add Category'</code></td><td>Hover, scroll, and typing into a field inside one dialog or section.</td></tr>
+</tbody></table><p class="sub">Names can be in 'single' or "double" quotes. You can also type these lines straight into a sheet or the Add case form; the bot understands them without AI.</p>`;
 
 // ── Runs ───────────────────────────────────────────────────────────────
 
@@ -359,7 +391,7 @@ export function runPage(run: Run, earlier: Run[] = []): string {
   const live = run.status === 'running' || run.status === 'queued';
   const pct = run.caseIds.length ? Math.round((run.results.length / run.caseIds.length) * 100) : 0;
   const issues = run.results.flatMap((r) => r.checks.filter((c) => c.state === 'fail').map((c) => ({ r, c })));
-  const reviews = run.results.flatMap((r) => r.checks.filter((c) => c.state === 'review').map((c) => ({ r, c })));
+  const reviews = run.results.flatMap((r) => r.checks.filter((c) => c.state === 'review' || (aiOnly(r) && c.by === 'ai' && c.state === 'pass')).map((c) => ({ r, c })));
   const rerun = [...new Set([...issues, ...reviews].map((i) => i.r.tc.id))];
   const changes = diff(run, earlier);
   const has = run.results.length > 0;
@@ -384,14 +416,14 @@ export function runPage(run: Run, earlier: Run[] = []): string {
     }
     ${changes}
     ${issues.length ? `<h2>Problems found (${issues.length})</h2><ul class="issues">${issues.map(({ r, c }) => `<li><a href="#${esc(r.tc.id)}"><b>${esc(r.tc.id)}</b></a> ${esc(c.label)} — <span class="actual">${esc(c.actual)}</span>${c.cause ? `<div class="cause">Likely cause: ${esc(c.cause)}</div>` : ''}</li>`).join('')}</ul>` : ''}
-    ${reviews.length ? `<h2>To review (${reviews.length})</h2><p class="sub">Checks the AI wrote from the sheet's sentence did not hold. Each is either a real bug or a misread sentence: look at the screenshot, then report the bug or correct the check under <a href="/suites/${esc(run.suiteId)}/rewrites">Review rewrites</a>.</p><ul class="issues">${reviews.map(({ r, c }) => `<li><a href="#${esc(r.tc.id)}"><b>${esc(r.tc.id)}</b></a> ${esc(c.label)} — <span class="actual">${esc(c.actual)}</span></li>`).join('')}</ul>` : ''}
+    ${reviews.length ? `<h2>To review (${reviews.length})</h2><p class="sub">Checks the AI wrote from the sheet's sentence: ones that did not hold, and cases that passed only on AI-written checks (marked AI-checked). Each could be a real bug, a misread sentence, or a check too weak to prove the point: look at the screenshot, then report the bug or correct the check under <a href="/suites/${esc(run.suiteId)}/rewrites">Review rewrites</a>.</p><ul class="issues">${reviews.map(({ r, c }) => `<li><a href="#${esc(r.tc.id)}"><b>${esc(r.tc.id)}</b></a> ${esc(c.label)} — <span class="actual">${esc(c.actual)}</span></li>`).join('')}</ul>` : ''}
     ${has ? '' : live ? '' : '<div class="empty"><b>No cases were checked in this run.</b><br>It stopped before the first case finished. Click Run again to retry.</div>'}
     ${has ? `<h2>Results</h2>` : ''}
     ${has ? wrap(`<table><thead><tr><th>ID</th><th>Case</th><th>Result</th><th>Main finding</th></tr></thead><tbody>${run.results
       .map((r) => {
         const f = r.checks.find((c) => c.state === 'fail') ?? r.checks.find((c) => c.state === 'review');
         const finding = f ? `${f.label}: ${f.actual}` : r.verdict === 'Blocked' ? r.notes.at(-1) ?? '' : r.error ?? '';
-        return `<tr><td><a href="#${esc(r.tc.id)}">${esc(r.tc.id)}</a></td><td>${esc(r.tc.title)}</td><td>${verdictBadge(r.verdict)}</td><td class="sub">${esc(finding.slice(0, 180))}</td></tr>`;
+        return `<tr><td><a href="#${esc(r.tc.id)}">${esc(r.tc.id)}</a></td><td>${esc(r.tc.title)}</td><td>${verdictBadge(r.verdict)}${aiOnly(r) ? ' <span class="tag ai">AI-checked</span>' : ''}</td><td class="sub">${esc(finding.slice(0, 180))}</td></tr>`;
       })
       .join('')}</tbody></table>`) : ''}
     ${run.results.map((r) => caseDetail(run, r)).join('')}`,
@@ -412,15 +444,18 @@ function diff(run: Run, earlier: Run[]): string {
     ${fixed.length ? `<p>✅ No longer failing: ${fixed.map(link).join(', ')}</p>` : ''}</section>`;
 }
 
+/** Review only because every passing check was written by AI (no check itself failed or is in review). */
+const aiOnly = (r: CaseResult) => r.verdict === 'Review' && aiChecked(r.checks) && !r.checks.some((c) => c.state === 'review');
+
 function caseDetail(run: Run, r: CaseResult): string {
   const fails = r.checks.filter((c) => c.state === 'fail');
   const aiSteps = r.steps.filter((s) => s.via === 'ai').length;
   const aiNotes = r.notes.filter((n) => /^AI read |the AI's corrected version|AI says /.test(n));
   return `<section class="case" id="${esc(r.tc.id)}">
-    <h3>${esc(r.tc.id)} · ${esc(r.tc.title)} ${verdictBadge(r.verdict)} <span class="sub">${(r.durationMs / 1000).toFixed(1)}s</span>${aiSteps || aiNotes.length ? ` <span class="tag ai" title="Some steps or checks were worked out by AI because the bot's rules did not cover them">AI helped</span>` : ''}</h3>
+    <h3>${esc(r.tc.id)} · ${esc(r.tc.title)} ${verdictBadge(r.verdict)}${aiOnly(r) ? ' <span class="tag ai" title="Every check that passed was written by AI, so a person should confirm it">AI-checked</span>' : ''} <span class="sub">${(r.durationMs / 1000).toFixed(1)}s</span>${aiSteps || aiNotes.length ? ` <span class="tag ai" title="Some steps or checks were worked out by AI because the bot's rules did not cover them">AI helped</span>` : ''}</h3>
     ${aiSteps || aiNotes.length ? `<div class="ai-box"><b>AI helped with ${aiSteps ? `${aiSteps} step${aiSteps === 1 ? '' : 's'}` : 'the checks'}.</b> <span class="sub">Its readings are saved as suggestions: approve them under <a href="/suites/${esc(run.suiteId)}/rewrites">Review rewrites</a> so the next run uses them directly, without AI.</span></div>` : ''}
     ${r.checks.length ? `<table class="checks"><thead><tr><th></th><th>Expected</th><th>Actual</th></tr></thead><tbody>${r.checks
-      .map((c) => `<tr class="${c.state}"><td>${STATE_ICON[c.state]}</td><td>${esc(c.label)}</td><td>${esc(c.actual)}${c.state === 'fail' && c.cause ? `<div class="cause">Likely cause: ${esc(c.cause)}</div>` : c.state === 'review' && c.cause ? `<div class="cause">${esc(c.cause)}</div>` : ''}</td></tr>`)
+      .map((c) => `<tr class="${c.state}"><td>${STATE_ICON[c.state]}</td><td>${esc(c.label)}${c.by === 'ai' ? ' <span class="tag ai">AI</span>' : ''}</td><td>${esc(c.actual)}${c.state === 'fail' && c.cause ? `<div class="cause">Likely cause: ${esc(c.cause)}</div>` : c.state === 'review' && c.cause ? `<div class="cause">${esc(c.cause)}</div>` : ''}</td></tr>`)
       .join('')}</tbody></table>` : ''}
     ${r.tc.reported ? `<p class="note"><b>Reported by the tester:</b> ${esc(r.tc.reported)}</p>` : ''}
     ${r.notes.map((n) => `<p class="note">${esc(n)}</p>`).join('')}
@@ -463,7 +498,7 @@ function fixPrompt(r: CaseResult, fails: Check[]): string {
 // ── Add / edit one issue by hand ───────────────────────────────────────
 
 /** `typed`: values from a submit that failed validation, shown back as typed (multi-line fields are one raw string). */
-export function issueFormPage(s: Suite, editing?: TestCase, flash?: string, typed?: TestCase): string {
+export function issueFormPage(s: Suite, editing?: TestCase, flash?: string, typed?: TestCase, pages: { path: string; name: string }[] = []): string {
   const c = typed ?? editing;
   const v = (x?: string | string[]) => esc(Array.isArray(x) ? x.join('\n') : x ?? '');
   const raw = typed !== undefined;
@@ -485,8 +520,9 @@ export function issueFormPage(s: Suite, editing?: TestCase, flash?: string, type
         <input name="title" value="${v(c?.title)}" placeholder="Export button missing on Customers page" required maxlength="200">
         <span class="hint">A short name for the problem.</span></label>
       <label><span>Page link ${s.source.kind === 'manual' ? '<span class="req">required</span>' : '<span class="opt">optional</span>'}</span>
-        <input name="url" value="${v(c?.url)}" placeholder="https://slshop.cloud/dashboard/customers"${s.source.kind === 'manual' ? ' required' : ''}>
-        <span class="hint">Where the problem happens. A full link, or just the part starting with <code>/dashboard/</code>.${s.source.kind === 'manual' ? '' : ` Empty = the suite's start page (<code>${esc(s.pagePath)}</code>).`}</span></label>
+        <input name="url" value="${v(c?.url)}" placeholder="https://slshop.cloud/dashboard/customers"${s.source.kind === 'manual' ? ' required' : ''}${pages.length ? ' list="known-pages" autocomplete="off"' : ''}>
+        ${pages.length ? `<datalist id="known-pages">${pages.map((x) => `<option value="${esc(x.path)}" label="${esc(x.name)}">${esc(x.name)}</option>`).join('')}</datalist>` : ''}
+        <span class="hint">Where the problem happens. A full link, or just the part starting with <code>/dashboard/</code>.${pages.length ? ` Start typing a path to pick one of the ${pages.length} known pages.` : ''}${s.source.kind === 'manual' ? '' : ` Empty = the suite's start page (<code>${esc(s.pagePath)}</code>).`}</span></label>
       <label><span>Expected result <span class="req">required</span></span>
         <textarea name="expected" rows="4" required placeholder="• The 'Export page' button should be visible.\n• The page should load without errors.">${raw ? v(c?.expected) : v(c?.expected.map((e) => `• ${e}`))}</textarea>
         <span class="hint">What <b>should</b> happen, one point per line (a paragraph also works). Names in 'single quotes' are checked exactly as written. <a href="/help#writing" target="_blank">Tips</a></span></label>
@@ -621,7 +657,7 @@ export function helpPage(): string {
       <table><tbody>
         <tr><td>${verdictBadge('Pass')}</td><td>Everything in Expected Result was checked and is correct.</td></tr>
         <tr><td>${verdictBadge('Fail')}</td><td><b>Something is wrong on the site.</b> These are the problems to fix.</td></tr>
-        <tr><td>${verdictBadge('Review')}</td><td><b>Look at this one.</b> A check the AI wrote did not hold. It may be a real bug, or the AI may have misread the sentence. Open the screenshot, then either report the bug or correct the check under <i>Review rewrites</i>.</td></tr>
+        <tr><td>${verdictBadge('Review')}</td><td><b>Look at this one.</b> A check the AI wrote did not hold, or the case passed only on checks the AI wrote (<span class="tag ai">AI-checked</span>). It may be a real bug, the AI may have misread the sentence, or its check may be too weak. Open the screenshot, then either report the bug or correct the check under <i>Review rewrites</i>.</td></tr>
         <tr><td>${verdictBadge('Partial')}</td><td>Everything the bot could check was correct, but some points couldn't be checked. The reason is shown; check those yourself.</td></tr>
         <tr><td>${verdictBadge('Blocked')}</td><td>The check needs something that doesn't exist, such as a staff account or an empty store.</td></tr>
         <tr><td>${verdictBadge('Error')}</td><td>The robot itself had a problem. This is not a problem with the site; try again.</td></tr>
@@ -730,13 +766,13 @@ export function helpPage(): string {
       <p>The bot has built-in rules for the pages it knows well. For everything else it gets help from an AI, <b>automatically, during the run</b>:</p>
       <ol>
         <li><b>A sentence it doesn't understand:</b> the AI reads it together with the case's title, preconditions, test data and <i>what is on the screen right now</i>, and turns it into simple steps. The bot does them straight away.</li>
-        <li><b>A step that fails on the page</b> (button not found, dialog not open, renamed label): the AI looks at the page and suggests a corrected step, and the bot tries it. The report keeps the original problem visible as "not checked", so a renamed button is never hidden.</li>
-        <li><b>An expected result it doesn't understand:</b> the AI turns it into checks the bot can measure (text shown, button visible, a number next to a label). It opens the tab the check is about first.</li>
+        <li><b>A step that fails on the page</b> (button not found, dialog not open, renamed label): the AI looks at the page (and a screenshot, when the provider can read images) and suggests a corrected step, and the bot tries it, up to 2 times. The report keeps the original problem visible as "not checked", so a renamed button is never hidden.</li>
+        <li><b>An expected result it doesn't understand:</b> the AI turns it into checks the bot can measure (text shown, button visible, a number next to a label). It opens the tab the check is about first. For "should increase by 5" or "should change", it remembers the value <i>before</i> the steps and compares afterwards.</li>
       </ol>
       <p>In the results, these steps carry an <span class="tag ai">AI</span> badge, and the case says <span class="tag ai">AI helped</span>. Pass and Fail are always decided by the bot's own checks, never by the AI.</p>
       <div class="tip"><b>Make it faster and repeatable.</b> Everything the AI worked out is saved as a suggestion. Open <b>Review rewrites</b> on the suite, check it, and click <b>Approve</b>. From then on the bot uses it directly, with no AI call, and gets the same result every time.</div>
-      <p><b>Safety.</b> When AI-driven steps would change a product (price, stock, status, channels), the bot first makes its own test product, <code>BTB &lt;case&gt; AI test item</code>, uses only that, and archives it afterwards. Real products are not touched. The AI is not used at all when no AI key is set.</p>
-      <p class="sub">Limits per case: at most 12 AI calls for steps and 12 for checks (<code>AI_MAX_CALLS_PER_CASE</code>). To switch live help off but keep the review page, set <code>AI_LIVE=off</code>.</p>
+      <p><b>Safety.</b> When AI-driven steps would change a product (price, stock, status, channels), the bot first makes its own test product, <code>BTB &lt;case&gt; AI test item</code>, uses only that, and archives it afterwards. Real products are not touched. The code itself also refuses risky clicks from AI steps (Delete, Archive, Refund, Place order, Log out, Generate, Bulk actions…) unless they are on a <code>BTB</code> test record; refused steps show as skipped. The AI is not used at all when no AI key is set.</p>
+      <p class="sub">Limits per case: at most 12 AI calls for steps and 12 for checks (<code>AI_MAX_CALLS_PER_CASE</code>), and at most 240 seconds of AI time (<code>AI_MAX_SECONDS_PER_CASE</code>). <code>AI_REPAIR_TRIES</code> (default 2) sets the repair tries and <code>AI_VISION=off</code> stops sending screenshots. To switch live help off but keep the review page, set <code>AI_LIVE=off</code>.</p>
       <h3>The step language</h3>
       ${ACTION_HELP}
       <h3 id="ai-keys">AI keys: free first, paid only as a backup</h3>
@@ -1037,6 +1073,7 @@ a.button.primary { background:var(--brand); border-color:var(--brand); color:#ff
 .finding-demo ul { padding-left:18px; } .pattern { border:1px dashed var(--line); border-radius:8px; padding:4px 14px; margin:10px 0; } .pattern p { margin:6px 0; }
 .fill { color:var(--muted); font-style:italic; }
 .example-cases td { vertical-align:top; } .example-cases code { white-space:nowrap; }
+.site-check h2 { margin-top:4px; } .site-check .toolbar { margin:10px 0 4px; } .page-head .toolbar { margin:0; }
 .tip { background:color-mix(in srgb, var(--running) 8%, var(--card)); border-left:3px solid var(--running); padding:10px 14px; border-radius:4px; margin:12px 0; }
 code { background:var(--bg); padding:1px 5px; border-radius:4px; font-size:12.5px; }
 `;

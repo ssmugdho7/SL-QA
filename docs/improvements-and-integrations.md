@@ -21,14 +21,16 @@ A rule-based **phrase engine** (`src/engine/phrases/`) maps sentences to actions
 
 ### 1.2 Capability snapshot (probe numbers)
 
-| Measure | Result |
-|---|---|
-| Clauses the rules understood (49 issues, 30 dashboard areas) | **51%** (103/202) |
-| Clauses that led to a rule doing real work | **44%** (89/202) |
-| Cases fully understood | **14%** (7/49) |
-| Quoted step style (`Click 'X'`, `EXPECT TEXT '…'`) | **97%** understood |
-| Formal test cases / Jira pastes / sloppy one-liners | 44% / 39% / 29% |
-| Effect of adding the `i` flag to the plain-click rule alone | 51% → **60%** |
+The first column is the assessment that produced this document; the second is after the October 2026 upgrade (Q1–Q7, Q10, M2, M9, part of B1 and of M3 done; see the ✅ marks below). Same 49 probe issues, rules only, no AI.
+
+| Measure | Before | After upgrade |
+|---|---|---|
+| Clauses the rules understood (49 issues, 30 dashboard areas) | 51% (103/202) | **78%** (158/202) |
+| Clauses that led to a rule doing real work | 44% (89/202) | **77%** (155/202) |
+| Cases fully understood | 14% (7/49) | **41%** (20/49) |
+| Quoted step style (`Click 'X'`, `EXPECT TEXT '…'`) | 97% | 97% |
+| Formal test cases / Jira pastes / sloppy one-liners | 44% / 39% / 29% | **84% / 68% / 53%** |
+| Dashboard pages known and checkable without writing cases | ~39 names | **142 pages** (site map) |
 | Stored cases that used AI help: share that passed | **7%** (2 of 28) |
 | `live-` report family: share that passed | 1 of 32 |
 | Missed clauses the step language cannot express, even with AI | about 25–30 of 99 |
@@ -42,10 +44,12 @@ The probe percentages come from `previewCase` (how sentences are read, not wheth
 | Products list; Add/Edit Product form (only when the gate regex matches) | **Well covered**: about 65–83% understood, with API cross-checks |
 | POS discount, total and receipt | **Partly covered**: 46%. Places real orders using one fixed `TEST_CUSTOMER` |
 | Orders, customers, dues, cashbook, inventory, dashboard home, shipping labels | **Partly covered**: 38–63%. Navigation works; row actions, filters and before/after values do not |
-| Coupons, categories, brands, staff, delivery, theme, fraud, barcodes, payments, settings, blog, reports | **Depends on AI**: 0–33% from rules alone. Several of these pages are missing from `pages.ts` |
+| Coupons, categories, brands, staff, delivery, theme, fraud, barcodes, payments, settings, blog, reports | **Depends on AI**: 0–33% from rules alone. Every page is now known by name from the site map, and each gets a generic read-only check (see Q4 and Q10) |
 | Storefront/checkout, second account or staff role, print/new tab, CSV contents, charts, third-party effects | **Not possible**: the step language cannot express them |
 
 ### 1.4 The problems that matter most
+
+> Status after the October 2026 upgrade: items 1, 3 and 4 are largely fixed, item 2 is fixed (AI-only passes are now Review), and item 5 is mostly fixed (page map + screenshots for Gemini, 2 repair tries, a code-level guard against destructive AI clicks, page-scoped rewrites). Items 6 and 7 are still open. The text below describes the state **before** the upgrade, for reference.
 
 1. **Silent misreads.** These count as "understood" but do the wrong thing, and they keep the AI from being asked:
    - `open dashboard page` accepts any page name. When the name is not in `PAGES`, it looks for a matching sidebar link, and if there is none it silently opens the suite's start page (`steps.ts:292-305`, `sidebarPath` at `steps.ts:925-933`).
@@ -87,35 +91,36 @@ Effort assumes one engineer who knows the codebase. Risk is the chance of breaki
 
 | # | Item | Benefit | Effort | Risk | Depends on |
 |---|---|---|---|---|---|
-| Q1 | Add the `i` flag to the plain-click rule (`natural.ts:362`); let "log in as store owner" match without "the" (the `log in` pattern, `steps.ts:237`) | 51% → about 60% understood; removes a false Blocked | Hours | Low: re-run the probe and the stored products sheet in `--preview` | — |
-| Q2 | Make `open dashboard page` throw `Missing` for an unknown page instead of using the start page | No silent wrong navigation; AI and recovery can step in | Hours | Low | — |
-| Q3 | Read double quotes in `quoted()` (`text.ts:61`, used by the fallback); let the step language take `"…"` so labels can contain apostrophes (`actions.ts:22`) | Recovers error-message checks; "Don't show" becomes writable | 1 day | Low | — |
-| Q4 | Add the missing pages to `pages.ts` (categories, brands, staff, reports, storefront and so on); read "A > B" breadcrumbs in `pagePath` | Navigation works on every dashboard area | 1 day | Low | Q2 |
-| Q5 | Widen the product-form gate (`index.ts:46-48`) to "create/new product" and "open the new product page" | Unlocks about 90 form rules and checks for natural wording | Hours | Medium: form rules might start matching list cases; check with the probe | — |
-| Q6 | Count passing live AI checks and AI-run steps as **Review**; report AI lines that were dropped (no rule matched, `mapLines` in `assist.ts:92-94`) or cut off (more than 12 lines, `translate.ts:141`) | Ends false passes from AI | 1 day | Low: some Pass results become Review, on purpose | — |
-| Q7 | Add the page path to the rewrite key (`translate.ts:32`); remove "Approve all" (`server.ts:196-199`) or require a page summary for offline suggestions (`server.ts:174`) | Fewer wrong rewrites reused on other pages | 1 day | Low: needs a one-time key migration of `translations.json` | — |
+| Q1 | Add the `i` flag to the plain-click rule (`natural.ts:362`); let "log in as store owner" match without "the" (the `log in` pattern, `steps.ts:237`) | ✅ Done. 51% → about 60% understood; removes a false Blocked | Hours | Low: re-run the probe and the stored products sheet in `--preview` | — |
+| Q2 | Make `open dashboard page` throw `Missing` for an unknown page instead of using the start page | ✅ Done. No silent wrong navigation; AI and recovery can step in | Hours | Low | — |
+| Q3 | Read double quotes in `quoted()` (`text.ts:61`, used by the fallback); let the step language take `"…"` so labels can contain apostrophes (`actions.ts:22`) | ✅ Done. Recovers error-message checks; "Don't show" becomes writable | 1 day | Low | — |
+| Q4 | ~~Add the missing pages to `pages.ts`; read "A > B" breadcrumbs in `pagePath`~~ **Done**: `pages.ts` merges the crawled site map (about 140 pages, about 800 names, including "A › B", "A > B" and "B under A") | Navigation works on every dashboard area | Done | — | Q2 |
+| Q5 | Widen the product-form gate (`index.ts:46-48`) to "create/new product" and "open the new product page" | ✅ Done. Unlocks about 90 form rules and checks for natural wording | Hours | Medium: form rules might start matching list cases; check with the probe | — |
+| Q6 | Count passing live AI checks and AI-run steps as **Review**; report AI lines that were dropped (no rule matched, `mapLines` in `assist.ts:92-94`) or cut off (more than 12 lines, `translate.ts:141`) | ✅ Done (passing AI-only cases become Review). Ends false passes from AI | 1 day | Low: some Pass results become Review, on purpose | — |
+| Q7 | Add the page path to the rewrite key (`translate.ts:32`); remove "Approve all" (`server.ts:196-199`) or require a page summary for offline suggestions (`server.ts:174`) | ✅ Page-scoped keys done; Approve all is still there. Fewer wrong rewrites reused on other pages | 1 day | Low: needs a one-time key migration of `translations.json` | — |
 | Q8 | Turn auth on by default, sanitise `marked` output, add a CSRF token | Basic safety for a tool that changes the store | 1–2 days | Low | — |
 | Q9 | Turn on Playwright tracing, plus video when a case fails | Much faster triage of a Fail | Hours | Low: more disk use | Retention policy (M-ops) |
+| Q10 | **Done**: read-only site crawler and site map (`apps/slshop/crawl.ts`, `site-map.json`), "Check the whole dashboard" suite (one generated case per page: health, NaN/undefined, heading, tabs, filter panel, search, next page), `--crawl` / `--site` CLI, and a known-pages picker on the Add case form | Every dashboard page is checked without writing cases | Done | Low: read-only; labels go stale until the next crawl (weekly or on demand) | — |
 
 ### 2.2 Medium (1–3 weeks each)
 
 | # | Item | Benefit | Effort | Risk | Depends on |
 |---|---|---|---|---|---|
-| M1 | **Page-knowledge packs** per area (orders, customers, coupons, categories, staff, settings, POS) | Lifts areas at 0–33% toward the products level; better AI labels | 2–3 days per area | Medium: labels go stale when the UI changes | Q4 |
-| M2 | **Value memory and scoped checks** in the step language: `REMEMBER`, comparisons, `IN ROW` for checks, `WAIT FOR`, `RELOAD`, `BACK`, `HOVER`, `TYPE … INTO … IN '<section>'` | Covers stock, total and balance claims, and "appears in the list" checks | 1–2 weeks | Low: additive grammar | — |
-| M3 | **Generic fixtures and cleanup** for orders, customers, coupons and categories, plus a **BTB guard in code** | Runs stop leaving data behind; AI cannot touch real records | 1–2 weeks | Medium: needs the right API endpoints per entity | API access per entity |
+| M1 | **Page-knowledge packs** per area (started: `pageInfo(path)` in `pages.ts` already gives each crawled page's headings, tabs, buttons, fields, columns and filters, ready for AI prompts) (orders, customers, coupons, categories, staff, settings, POS) | Lifts areas at 0–33% toward the products level; better AI labels | 2–3 days per area | Medium: labels go stale when the UI changes | Q4 |
+| M2 | **Value memory and scoped checks** in the step language: `REMEMBER`, comparisons, `IN ROW` for checks, `WAIT FOR`, `RELOAD`, `BACK`, `HOVER`, `TYPE … INTO … IN '<section>'` | ✅ Done. Covers stock, total and balance claims, and "appears in the list" checks | 1–2 weeks | Low: additive grammar | — |
+| M3 | **Generic fixtures and cleanup** for orders, customers, coupons and categories, plus a **BTB guard in code** | Partly done: the BTB guard now refuses destructive AI and plain-language clicks on non-BTB records; fixtures for orders/customers/coupons are still open. Runs stop leaving data behind; AI cannot touch real records | 1–2 weeks | Medium: needs the right API endpoints per entity | API access per entity |
 | M4 | **API-level assertions** (`EXPECT API GET … field = …`) and network checks per step | Precise checks that don't depend on the DOM | 1 week | Low | `Api` class |
 | M5 | **Flaky handling**: rerun a failed case once, tag it "flaky" if the rerun passes, keep history per case | Separates bot noise from real bugs | 1 week | Low: longer runs | Run history (B6 helps) |
 | M6 | **Jira, GitHub and Slack** (see §4.4) | Closes the loop with the team | 1–2 weeks | Medium: credential handling | Secrets in `.env` only |
 | M7 | **CI and scheduling**: headless CLI with exit codes, JUnit output, nightly job | Catches regressions automatically | 3–5 days | Medium: overlaps with web runs | A lock between CLI and web runner |
 | M8 | **Multiple accounts and staff roles**: one storageState per account, plus `LOG IN AS 'role'` | Permission issues become testable | 1 week | Medium | Staff test accounts in the store |
-| M9 | **More AI repair attempts**: up to N tries, the result fed back, a time budget per case | Recovers from several wrong turns | 1 week | Medium: cost and timeouts | Q6; B1 helps |
+| M9 | **More AI repair attempts**: up to N tries, the result fed back, a time budget per case | ✅ Done (2 tries, 240 s AI time cap). Recovers from several wrong turns | 1 week | Medium: cost and timeouts | Q6; B1 helps |
 
 ### 2.3 Big upgrades (months)
 
 | # | Item | Benefit | Effort | Risk | Depends on |
 |---|---|---|---|---|---|
-| B1 | **Vision AI**: screenshot plus accessibility tree, and a check that every label exists on the page | Icon buttons, closed menus and visual bugs become reachable | 3–5 weeks | Medium: privacy and cost | Privacy masking, paid budget |
+| B1 | **Vision AI**: screenshot plus accessibility tree, and a check that every label exists on the page | Partly done: Gemini/Anthropic/OpenAI get a small screenshot; the label-exists check is still open. Icon buttons, closed menus and visual bugs become reachable | 3–5 weeks | Medium: privacy and cost | Privacy masking, paid budget |
 | B2 | **Agentic runner** with a bounded loop and guardrails | Goal-style steps become runnable flows | 1–2 months | High unless M3's guard exists | B1, M2, M3 |
 | B3 | **Self-healing locators** | Survives dashboard redesigns | 1 month | Medium: healing might choose the wrong element | M1 |
 | B4 | **Recorder**: a manual session becomes step-language lines | Understanding near 100% for recorded issues | 1 month | Low | M2 |

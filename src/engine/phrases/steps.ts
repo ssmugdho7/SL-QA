@@ -5,8 +5,8 @@ import { config } from '../config.js';
 import { Blocked, type CaseContext } from '../context.js';
 import { Missing, escapeRe, exactText } from '../ui.js';
 import { emptyCategory, resolveCategory } from './fixtures.js';
-import { pagePath } from '../pages.js';
-import { lc, quoted } from './text.js';
+import { pageNames, pagePath, PAGE_NAMES } from '../pages.js';
+import { lc, quoted, words } from './text.js';
 
 /**
  * Step rules: one sentence fragment → one browser action.
@@ -50,7 +50,7 @@ async function showFixtures(t: CaseContext): Promise<void> {
   }
 }
 
-async function rowName(t: CaseContext, hint: string): Promise<string> {
+export async function rowName(t: CaseContext, hint: string): Promise<string> {
   if (/ordered|has orders|with orders/i.test(hint) && t.orderedProduct) {
     if (!(await t.ui.isListPage())) await t.ui.goto(t.startPath);
     await t.ui.setView('list');
@@ -104,6 +104,8 @@ async function ensureSelection(t: CaseContext): Promise<void> {
 export async function clickNamed(t: CaseContext, name: string, opts: { inRow?: string } = {}): Promise<void> {
   const ui = t.ui;
   const re = exactText(name);
+  // "Open it again" / "click it again" repeat this click.
+  t.noted.set('__lastClick', name);
   if (BULK_ACTIONS.test(name) && !(await ui.dialog().count())) await ensureSelection(t);
   if (opts.inRow) {
     const row = ui.row(opts.inRow);
@@ -154,7 +156,7 @@ export async function clickNamed(t: CaseContext, name: string, opts: { inRow?: s
  * "Click 'Duplicate'" means duplicate: if the click opens a confirmation and the next step does not deal with
  * that dialog itself (confirm / cancel / "in the confirmation box…"), accept it.
  */
-async function acceptConfirmation(t: CaseContext, name: string): Promise<string | undefined> {
+export async function acceptConfirmation(t: CaseContext, name: string): Promise<string | undefined> {
   const next = (t.noted.get('__next') as string | undefined) ?? '';
   if (/\b(confirm|cancel|confirmation|dialog)\b/i.test(next)) return undefined;
   const dialog = t.ui.dialog();
@@ -230,16 +232,22 @@ async function readClipboard(t: CaseContext): Promise<string> {
   return t.page.evaluate(() => navigator.clipboard.readText().catch(() => '')).catch(() => '');
 }
 
+/** One quoted name in 'single', "double" or curly quotes (one capture group); an apostrophe inside a word (Don't) stays in it. */
+export const Q = `['"‘“]((?<=')(?:[^']|'(?=[A-Za-z]))+(?=')|(?<=")[^"]+(?=")|(?<=‘)[^’]+(?=’)|(?<=“)[^”]+(?=”))['"’”]`;
+
+/** A target that reads like a dashboard page: a known name, "… page/screen/section", or a breadcrumb "A > B". */
+const PAGE_TARGET = `(?:dashboard\\s*[>›]\\s*)?(?:(${PAGE_NAMES})(?:\\s+(?:page|screen|section|module|menu))?|((?!(?:the\\s+)?(?:last|next|previous|first|\\d+|same|new|any|an?|one|some|this|that|its|their|downloaded)\\b)(?!(?:the\\s+)?(?:[\\w'-]+\\s+)?details?\\b)[\\w &'/-]+?)\\s+(?:page|screen|section|module)|([\\w &'/-]+?\\s*[>›]\\s*[\\w &'/>›-]+?))`;
+
 export const STEP_RULES: StepRule[] = [
   // ── Session & navigation ─────────────────────────────────────────────
   {
     name: 'log in',
-    pattern: /^(?:then\s+)?log in as (?:the store owner|owner|an? (?:store )?owner)\b/i,
+    pattern: /^(?:then\s+)?log ?in as (?:the |an? )?(?:store |shop )?(?:owner|admin(?:istrator)?|merchant)\b/i,
     run: async () => 'Already logged in as the store owner.',
   },
   {
     name: 'log in as other user',
-    pattern: /^(?:then\s+)?log in as (?:a |an )?(.+)$/i,
+    pattern: /^(?:then\s+)?log ?in as (?:a |an )?(.+)$/i,
     run: async (t, m) => {
       throw new Blocked(`Needs a second account (${m[1]}); the remaining steps were skipped. Expectations about it are marked as not checked.`, true);
     },
@@ -277,7 +285,17 @@ export const STEP_RULES: StepRule[] = [
       await t.ui.goto(t.startPath, { waitForList: !t.state.loggedOut });
     },
   },
-  { name: 'press enter', pattern: /^press enter$/i, run: async () => undefined },
+  {
+    name: 'press enter',
+    pattern: /^(?:press|hit) (?:the )?enter(?: key)?$/i,
+    run: async (t) => {
+      // Search boxes filter as you type; Enter only matters (and is safe) in a focused search or text box.
+      const focused = await t.page.evaluate(() => { const e = document.activeElement as HTMLInputElement | null; return !!e && e.tagName === 'INPUT' && /^(search|text|)$/.test(e.type); }).catch(() => false);
+      if (!focused) return 'No text box had focus; nothing to submit.';
+      await t.page.keyboard.press('Enter');
+      await t.ui.settle();
+    },
+  },
   {
     name: 'open a product',
     pattern: /^open (one|another|a|the) product$/i,
@@ -290,18 +308,27 @@ export const STEP_RULES: StepRule[] = [
   },
   {
     name: 'open dashboard page',
-    pattern: /^(?:open|go to|go back to|return to|navigate to|visit) (?:the )?(?:dashboard\s*>\s*)?([\w &'-]+?)(?: page)?(?: from the left sidebar| from the sidebar)?$/i,
+    // Only targets that read like a page: "open the Filter panel", "open a product", "Open the Stock tab" are not navigation.
+    pattern: new RegExp(`^(?:open|go to|go back to|return to|navigate to|visit|switch to|move to|head to) (?:the )?${PAGE_TARGET}(?: (?:from|in|on|via|using) the (?:left )?(?:sidebar|side ?bar|menu|side menu|navigation(?: menu)?))?$`, 'i'),
     run: async (t, m) => {
-      const page = m[1].trim();
-      if (/^(another|one|a|the)\b.*\bproduct\b/i.test(page) || /^product$/i.test(page)) return;
-      if (/detail/i.test(page)) return;
-      if (lc(page) === lc(pageTitle(t.startPath)) || /^dashboard$/i.test(page) === false) {
-        const target = lc(page) === lc(pageTitle(t.startPath)) ? t.startPath : pagePath(page) ?? (await sidebarPath(t, page));
+      const page = (m[1] ?? m[2] ?? m[3]).trim();
+      const target = lc(page) === lc(pageTitle(t.startPath)) ? t.startPath : pagePath(page) ?? (await sidebarPath(t, page));
+      if (target) {
         await t.ui.goto(target);
         t.state = { filters: {}, store: t.state.store, loggedOut: t.state.loggedOut };
-        return;
+        return `Opened ${target}.`;
       }
-      await t.ui.goto('/dashboard', { waitForList: false });
+      // "Products > Add Product": the page, then the control on it.
+      const crumbs = page.split(/\s*[>›]\s*/).filter(Boolean);
+      const parent = crumbs.length > 1 ? pagePath(crumbs.slice(0, -1).join(' > ')) : null;
+      if (parent) {
+        await t.ui.goto(parent);
+        t.state = { filters: {}, store: t.state.store, loggedOut: t.state.loggedOut };
+        await clickNamed(t, crumbs.at(-1)!);
+        await t.ui.settle();
+        return `Opened ${parent} and clicked '${crumbs.at(-1)}'.`;
+      }
+      throw new Missing(`a page named '${page}'`, nearPages(page));
     },
   },
   {
@@ -313,7 +340,7 @@ export const STEP_RULES: StepRule[] = [
   },
   {
     name: 'reload',
-    pattern: /^(?:reload|refresh)(?: the page)?$/i,
+    pattern: /^(?:reload|refresh)(?: the)?(?: (?:page|browser|screen|list|tab|browser tab))?(?: again)?$|^(?:press f5|hard refresh(?: the page)?)$/i,
     run: async (t) => {
       await t.page.reload({ waitUntil: t.state.offline ? 'domcontentloaded' : 'networkidle' }).catch(() => undefined);
       if (t.state.offline) await t.page.waitForTimeout(6_000);
@@ -322,7 +349,16 @@ export const STEP_RULES: StepRule[] = [
       t.state.tab = undefined;
     },
   },
-  { name: 'scroll', pattern: /^scroll to the (?:bottom|top)/i, run: async (t) => void (await t.page.mouse.wheel(0, 5000)) },
+  {
+    name: 'scroll',
+    pattern: /^scroll (?:(down|up)(?: the (?:page|list))?(?: a (?:bit|little))?(?: (?:more|again))?|(?:(down|up) )?to the (bottom|top|end|end of the (?:page|list))\b.*)$/i,
+    run: async (t, m) => {
+      const up = /up|top/i.test(`${m[1] ?? ''}${m[2] ?? ''}${m[3] ?? ''}`);
+      if (/top/i.test(m[3] ?? '')) await t.page.evaluate(() => window.scrollTo(0, 0));
+      else await t.page.mouse.wheel(0, up ? -800 : m[3] ? 20_000 : 800);
+      await t.page.waitForTimeout(400);
+    },
+  },
   {
     name: 'go offline',
     pattern: /^turn off the internet|^(?:go|work) offline|^block the (.+?) request/i,
@@ -357,14 +393,16 @@ export const STEP_RULES: StepRule[] = [
   // ── Looking & noting (they only snapshot; expectations read the snapshots) ──
   {
     name: 'note',
-    pattern: /^note\b(.*)$/i,
+    // "Note the count" remembers; "note 'Test'" (a value in quotes) is text for a Note field, read by a later rule.
+    pattern: /^note\b(?!\s*[:=]?\s*['"‘“][^'"’”]*['"’”]\s*$)(.*)$/i,
     run: async (t, m) => {
       t.noted.set(`note:${m[1].trim()}`, t.snaps.length);
     },
   },
   {
     name: 'look/check/compare',
-    pattern: /^(?:look at|check|compare|for each tab|find it|look\b)/i,
+    // Only looking: "Check the Stock History tab" opens a tab, "check the log after deleting a product" does something first.
+    pattern: /^(?!(?:look at|check|look)\s+(?:the\s+)?[^,]*\btab$)(?!.*\b(?:after|before|while|once)\s+\w+ing\b)(?!check(?:\s+the)?\s+(?:check ?box|box)\b)(?:look at|check|compare|for each tab|find it|look\b)/i,
     run: async () => undefined,
   },
   {
@@ -391,12 +429,24 @@ export const STEP_RULES: StepRule[] = [
   },
   {
     name: 'type quoted in search',
-    pattern: /^type '(.+)' in(?:to)? (?:the )?(?:search|'search[^']*')(?: box)?$/i,
+    pattern: new RegExp(`^(?:type|enter|input) ${Q} in(?:to)? (?:the )?(?:search|'search[^']*'|"search[^"]*")(?: (?:box|bar|field|input))?$`, 'i'),
     run: async (t, m) => typeInSearch(t, m[1]),
   },
   {
+    name: 'search products by kind',
+    pattern: /^search (?:for )?(?:an? |the |any )?products? (?:by|with|using) (?:its |their |the |an? )?(sku|name|english name|bangla name|part of (?:its |the |a )?name|partial name)$/i,
+    run: async (t, m) => {
+      if (!/\/dashboard\/products(?:[?#]|$)/.test(new URL(t.page.url()).pathname)) await t.ui.goto('/dashboard/products');
+      const { value, target } = await valueFor(t, m[1]);
+      await typeInSearch(t, value, lc(m[0]));
+      t.state.searchTarget = target;
+      return `Searched ${JSON.stringify(value)}.`;
+    },
+  },
+  {
     name: 'type described value',
-    pattern: /^type (?:an? |only )?(.+?)(?: in(?:to)? the '[^']+' box| in search)?$/i,
+    // A description of what to type ("a Bangla product name", "a random word"); a quoted value is typed as written elsewhere.
+    pattern: /^type (?!(?:an? |only )?['"‘“])(?=.*\b(?:random|not exist|no match|sql|script|spaces|bangla|english|sku|part(?:ial)?|name|word)\b)(?:an? |only )?(.+?)(?: in(?:to)? the '[^']+' box| in(?:to)? (?:the )?search(?: box| bar)?)?$/i,
     run: async (t, m) => {
       const { value, target } = await valueFor(t, m[1]);
       await typeInSearch(t, value, lc(m[0]));
@@ -408,7 +458,7 @@ export const STEP_RULES: StepRule[] = [
   // ── Tabs, view, sort, rows, pager ────────────────────────────────────
   {
     name: 'click status tab',
-    pattern: /^(?:click|open) the '(.+)' tab$/i,
+    pattern: new RegExp(`^(?:click|open) the ${Q} tab$`, 'i'),
     run: async (t, m) => {
       await clearFixtureSearch(t);
       if (!(await t.ui.exists(t.ui.statusTab(m[1])))) return clickNamed(t, m[1]);
@@ -468,9 +518,9 @@ export const STEP_RULES: StepRule[] = [
   },
   {
     name: 'go to page N',
-    pattern: /^(?:with a sort selected,? )?go to page (\d+)$/i,
+    pattern: /^(?:with a sort selected,? )?(?:go|navigate|move|switch|jump) to page (?:number |no\.? )?(\d+)(?: of the (?:list|results|table))?$|^(?:open|click(?: on)?) page (\d+)(?: (?:button|link))?$/i,
     run: async (t, m) => {
-      const n = Number(m[1]);
+      const n = Number(m[1] ?? m[2]);
       const button = t.ui.main.getByRole('button', { name: exactText(String(n)) }).filter({ visible: true }).first();
       if (await button.count()) await button.click();
       else for (let i = 1; i < n; i++) await t.page.getByLabel('Next page', { exact: true }).click();
@@ -492,7 +542,7 @@ export const STEP_RULES: StepRule[] = [
   // ── Filter dialog ────────────────────────────────────────────────────
   {
     name: 'open filter',
-    pattern: /^(?:open|click) '?filter'?(?: again)?$/i,
+    pattern: /^(?:open|click(?: on)?) (?:the )?['"‘“]?filter['"’”]?(?: (?:panel|button|dialog|drawer|menu|icon|options))?(?: again)?$/i,
     run: async (t) => {
       await t.ui.openFilter();
     },
@@ -614,7 +664,7 @@ export const STEP_RULES: StepRule[] = [
   },
   {
     name: 'open product detail',
-    pattern: /^open the product'?s? detail page/i,
+    pattern: /^open (?:the |any |a |one )?product'?s?(?: details?)? page|^open (?:the )?(?:product )?detail(?:s)? page of (?:a|any|the) product/i,
     run: async (t) => {
       const name = (t.noted.get('__row') as string | undefined) ?? (await rowName(t, ''));
       await openDetail(t, name);
@@ -716,7 +766,14 @@ export const STEP_RULES: StepRule[] = [
     run: async (t) => {
       // In an open form dialog, "save" means its submit button (Save / Apply / Update / Done).
       const dialog = t.ui.dialog();
-      if (!(await dialog.count())) return;
+      if (!(await dialog.count())) {
+        // A form on the page itself (settings, a category form): its Save button. None: an earlier step already saved.
+        const onPage = t.ui.main.getByRole('button', { name: /^\s*(save( changes)?|update|save & (?:close|continue))\s*$/i }).filter({ visible: true });
+        if (!(await onPage.count())) return 'Nothing open to save (no form with a Save button).';
+        await onPage.last().click();
+        await t.ui.settle();
+        return 'Clicked Save on the page.';
+      }
       const submit = dialog.getByRole('button', { name: /^(save( changes)?|apply|update|done|confirm)$/i }).filter({ visible: true });
       if (!(await submit.count())) return;
       await submit.last().click();
@@ -738,7 +795,7 @@ export const STEP_RULES: StepRule[] = [
   },
   {
     name: 'select N products',
-    pattern: /^select (?:the same )?(\d+)(?: test)? products?(?: with no orders and (\d+) products? that has orders)?$|^select (?:them|the same \d+) again$|^select the same (\d+)$|^with the same (\d+) selected$/i,
+    pattern: /^select (?:the same )?(\d+)(?: test)? products?(?: with no orders and (\d+) products? that has orders)?(?: (?:using|with|by ticking|by clicking|via) (?:the |their )?(?:row )?check ?box(?:es)?| from the list)?$|^select (?:them|the same \d+) again$|^select the same (\d+)$|^with the same (\d+) selected$/i,
     run: async (t, m) => {
       const n = Number(m[1] ?? m[3] ?? m[4] ?? t.selection.length);
       const ordered = m[2] ? Number(m[2]) : 0;
@@ -888,7 +945,7 @@ export const STEP_RULES: StepRule[] = [
   // ── Generic click (last, so the specific rules above win) ────────────
   {
     name: 'click named control',
-    pattern: /^(?:click|press|tap|open) (?:the )?'([^']+)'(?: (?:button|tab|link|menu item|option))?(?: (?:at the (?:bottom|top)|on (?:a|the|any) product.*))?$/i,
+    pattern: new RegExp(`^(?:click|press|tap|open) (?:on )?(?:the )?${Q}(?: (?:button|tab|link|menu item|option))?(?: (?:at the (?:bottom|top)|on (?:a|the|any) product.*))?$`, 'i'),
     run: async (t, m) => {
       const name = m[1];
       const inMenu = t.page.getByRole('menuitem', { name: exactText(name) });
@@ -911,9 +968,27 @@ export const STEP_RULES: StepRule[] = [
   {
     name: 'click bare word',
     pattern: /^click (sort|filter|done|next|previous|cancel|delete|save)$/i,
-    run: async (t, m) => clickNamed(t, m[1]),
+    run: async (t, m, clause) => {
+      // "Click Delete" with nothing selected or in use would delete whatever the page shows first.
+      if (/delete/i.test(m[1]) && !(await t.ui.dialog().count())) guard(t, m[1], clause);
+      return clickNamed(t, m[1]);
+    },
   },
 ];
+
+/** Clicks that change or lose real data; plain-language steps may do them only on test records ('BTB …'). */
+const DANGER = /\b(?:delete|remove|archive|trash|cancel (?:the )?(?:order|subscription|plan|invoice|shipment|consignment)|refund|void|disconnect|uninstall|deactivate|log ?out|sign ?out|empty cart|clear cart)\b/i;
+const HARMLESS = /\b(?:filters?|search|sort|selection|image preview|item from (?:the )?cart)\b/i;
+
+/** Throws Blocked when `name` would delete, cancel, refund … something that is not a test record. */
+export function guard(t: CaseContext, name: string, clause: string): void {
+  if (!DANGER.test(name) || HARMLESS.test(name)) return;
+  const btb = new RegExp(`\\b${config.fixturePrefix}\\b`);
+  // The sentence names a test record, the rows ticked for a bulk action are all test products, or the record in use is one.
+  const row = t.noted.get('__row') as string | undefined;
+  if (btb.test(clause) || (t.selection.length && t.selection.every((n) => btb.test(n))) || (!t.selection.length && row && btb.test(row))) return;
+  throw new Blocked(`"${clause}" would ${name.toLowerCase()} real store data, so the bot did not do it and stopped here. Write the step about a test record named '${config.fixturePrefix} …' to let it run.`, true);
+}
 
 /** Title of a dashboard path: "/dashboard/products" → "Products". */
 export function pageTitle(p: string): string {
@@ -921,13 +996,20 @@ export function pageTitle(p: string): string {
   return last[0].toUpperCase() + last.slice(1);
 }
 
-/** Finds a sidebar link by its label ("Products", "Orders") and returns its path. */
-export async function sidebarPath(t: CaseContext, label: string): Promise<string> {
-  const href = await t.page.evaluate((l) => {
-    const want = l.toLowerCase();
-    const links = [...document.querySelectorAll('nav a[href^="/dashboard"]')] as HTMLAnchorElement[];
+/** Finds a sidebar link by its label ("Products", "Orders") and returns its path, or null when there is none. */
+export async function sidebarPath(t: CaseContext, label: string): Promise<string | null> {
+  return t.page.evaluate((l) => {
+    const want = l.toLowerCase().replace(/\s+/g, ' ').trim();
+    const links = [...document.querySelectorAll('nav a[href^="/dashboard"], aside a[href^="/dashboard"]')] as HTMLAnchorElement[];
     const hit = links.find((a) => a.innerText.split('\n').map((s) => s.trim().toLowerCase()).includes(want));
     return hit?.getAttribute('href') ?? null;
   }, label).catch(() => null);
-  return href ?? t.startPath;
+}
+
+/** Known page names sharing a word with `name` (else a sample), for a "no such page" message. */
+export function nearPages(name: string): string[] {
+  const all = Object.keys(pageNames()).filter((n) => n.length < 40 && !/ (?:under|in) /.test(n));
+  const want = new Set(words(name).split(' ').filter((w) => w.length > 2 && !/^(?:page|the|and)$/.test(w)));
+  const near = all.filter((n) => words(n).split(' ').some((w) => want.has(w) || [...want].some((x) => w.startsWith(x.slice(0, 5)))));
+  return [...new Set(near.length ? near : all.filter((n) => !n.includes('>')))].slice(0, 12);
 }

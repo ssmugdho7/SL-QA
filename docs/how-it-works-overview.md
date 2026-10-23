@@ -83,7 +83,9 @@ Overall it understood about half of all sentences without AI, and only 7 of the 
 
 **Partly works:** **POS** (point of sale) discount, total and receipt checks (they work when written the way the bot's phrases expect, but only about half of the sample POS sentences were understood), orders, customers, customer dues, cashbook, inventory, the dashboard home page and shipping labels. Opening these pages works, but actions on a single row, filters, and "before and after" comparisons usually don't.
 
-**Mostly depends on AI:** coupons, categories, brands, staff, delivery and courier, theme, fraud, barcodes, payments, settings, blog and reports. Some of these pages are not yet in the bot's list of known pages.
+**Mostly depends on AI:** coupons, categories, brands, staff, delivery and courier, theme, fraud, barcodes, payments, settings, blog and reports. The bot now knows all of these pages by name (for example "Products › Categories" or "Settings > Tax"), but what to do on them is still mostly worked out by the AI or written in the step language.
+
+**It can check every page of the dashboard.** One button, **🔎 Check the whole dashboard** on the Suites page, makes a list of about 140 checks, one for each page in the menu (reports, settings and sub-pages included). The bot finds the pages itself by walking the dashboard's menus, which takes about five minutes and is repeated every week or when you ask. For each page it checks that the page opens without errors, shows no broken values such as "NaN" and shows its title, and then gently tries the page's tabs, filter panel, search box and next page. It only looks and clicks harmless things: it never creates, saves or deletes anything. You don't have to write these cases; you tick the pages you want and press Run, as with any other list.
 
 **Can't do yet:**
 - The customer-facing storefront or checkout (the only exception: after saving a product, it can open that product's own storefront page)
@@ -95,7 +97,7 @@ Overall it understood about half of all sentences without AI, and only 7 of the 
 
 **Known weak spots to be aware of:**
 - Some ordinary wordings are misread. For example, "Click Place Order" with a capital C is not recognised, but "click Place Order" is.
-- If you ask it to open a page it doesn't know, it can quietly stay on the starting page and carry on.
+- If you ask it to open a page it doesn't know, it can quietly stay on the starting page and carry on. (It now knows every page in the dashboard menu, so this mostly happens with misspelt names.)
 - Text in "double quotes" is not picked up in most sentences (clicks and expected results). Use 'single quotes'.
 
 ---

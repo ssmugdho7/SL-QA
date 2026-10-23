@@ -8,15 +8,17 @@ import { casesFromUpload } from '../engine/sources/upload.js';
 import { rowUrl, splitList, type TestCase } from '../engine/sources/cases.js';
 import { parseBugText } from '../engine/sources/bug-text.js';
 import { EXAMPLE_CASES, EXAMPLE_SUITE_NAME, exampleCsv } from './example.js';
-import { cancel, enqueue, recover } from './runner.js';
+import { cancel, crawlState, enqueue, recover, startCrawl, syncSiteSuite } from './runner.js';
+import { loadSiteMap, siteCases, siteMapAge } from '../engine/apps/slshop/crawl.js';
+import { knownPages } from '../engine/pages.js';
 import { newId, runs, suites, uploadsDir, type Run, type Suite } from './store.js';
-import { aiKeysPage, helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow } from './views.js';
+import { aiKeysPage, helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow, type SiteInfo } from './views.js';
 import { previewCase } from '../engine/phrases/index.js';
 import { expectClauses, stepClauses } from '../engine/phrases/split.js';
 
 const stepPieces = (sentence: string) => stepClauses(sentence).map((c) => c.text);
 import { status as aiStatus, resetCoolDowns, paidDailyLimit, usage as aiUsage } from '../engine/ai/providers.js';
-import { aiProvider, keyOf, loadTranslations, saveTranslations, setStatus, translate, type Kind } from '../engine/ai/translate.js';
+import { aiProvider, keyOf, lookup, pageKeyOf, loadTranslations, saveTranslations, setStatus, translate, type Kind } from '../engine/ai/translate.js';
 
 type Form = { fields: Record<string, string[]>; files: Record<string, { name: string; data: Buffer }> };
 
@@ -99,6 +101,11 @@ function lastRunBySuite(): Map<string, Run> {
 
 async function loadCases(source: Suite['source'], upload?: { name: string; data: Buffer }): Promise<TestCase[]> {
   if (source.kind === 'manual') return [];
+  if (source.kind === 'site') {
+    const map = loadSiteMap();
+    if (!map) throw new Error('There is no site map yet. Use "Check the whole dashboard" on the Suites page to crawl it.');
+    return siteCases(map);
+  }
   if (source.kind === 'sheet') return casesFromSheet(source.url);
   const data = upload?.data ?? fs.readFileSync(path.join(uploadsDir(), source.file));
   return casesFromUpload(source.file, data);
@@ -111,7 +118,20 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const post = req.method === 'POST';
   let m: RegExpMatchArray | null;
 
-  if (p === '/' && !post) return send(res, 200, homePage(suites.all(), lastRunBySuite()));
+  if (p === '/' && !post) return send(res, 200, homePage(suites.all(), lastRunBySuite(), undefined, undefined, siteInfo(url.searchParams.get('msg') ?? undefined)));
+
+  // "Check the whole dashboard": crawl when the site map is missing, over 7 days old or on request, else (re)build the suite from it.
+  if (p === '/site' && post) {
+    const form = await parseForm(req);
+    const map = loadSiteMap();
+    if (crawlState.running) return redirect(res, `/?msg=${encodeURIComponent('The dashboard is being crawled; the suite is updated when it ends.')}#site`);
+    if (field(form, 'recrawl') === '1' || !map || siteMapAge(map) > 7) {
+      startCrawl();
+      return redirect(res, `/?msg=${encodeURIComponent('Crawling the dashboard (read-only). It takes about 5 minutes; this page refreshes itself.')}#site`);
+    }
+    const s = syncSiteSuite()!;
+    return redirect(res, `/suites/${s.id}?msg=${encodeURIComponent(`${plural(s.cases.length, 'page')} from the site map of ${new Date(map.generatedAt).toLocaleDateString('en-GB', { dateStyle: 'medium' })}. Tick the ones to check and press Run.`)}`);
+  }
 
   if (p === '/suites' && post) {
     const form = await parseForm(req);
@@ -140,7 +160,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       return redirect(res, kind === 'manual' ? `/suites/${id}/issues/new` : `/suites/${id}`);
     } catch (e) {
       // Show the form again with what was typed (a chosen file can't be kept by the browser).
-      return send(res, 400, homePage(suites.all(), lastRunBySuite(), (e as Error).message, { kind, name: field(form, 'name'), url: sheet, pagePath }));
+      return send(res, 400, homePage(suites.all(), lastRunBySuite(), (e as Error).message, { kind, name: field(form, 'name'), url: sheet, pagePath }, siteInfo()));
     }
   }
 
@@ -173,7 +193,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       try {
         const t = await translate(u.kind as Kind, u.text, { page: tc.url || s.pagePath, title: tc.title, steps: tc.steps, expected: tc.expected });
         if (t) {
-          all[keyOf(u.kind as Kind, u.text)] = t;
+          all[pageKeyOf(u.kind as Kind, tc.url || s.pagePath, u.text)] = t;
           made++;
         }
       } catch (e) {
@@ -210,7 +230,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (!s) return send(res, 404, notFound('suite'));
     const editing = m[2] === 'new' ? undefined : s.cases.find((c) => c.id === decodeURIComponent(m![2].replace(/\/edit$/, '')));
     if (m[2] !== 'new' && !editing) return send(res, 404, notFound());
-    return send(res, 200, issueFormPage(s, editing, url.searchParams.get('msg') ?? undefined));
+    return send(res, 200, issueFormPage(s, editing, url.searchParams.get('msg') ?? undefined, undefined, pageOptions()));
   }
 
   if ((m = p.match(/^\/suites\/([\w-]+)\/issues(?:\/([^/]+))?(?:\/(delete))?$/)) && post) {
@@ -236,13 +256,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     if (field(form, 'then') === 'parse') {
       const text = field(form, 'paste');
       const editing = targetId ? s.cases.find((c) => c.id === targetId) : undefined;
-      if (!text) return send(res, 422, issueFormPage(s, editing, 'Paste a bug report first.'));
+      if (!text) return send(res, 422, issueFormPage(s, editing, 'Paste a bug report first.', undefined, pageOptions()));
       const bug = parseBugText(text);
       const filled = { ...(editing ?? {}), id: field(form, 'id') || editing?.id || '', title: bug.title, url: bug.url, reported: bug.reported, preconditions: bug.preconditions, priority: field(form, 'priority'), scenario: field(form, 'scenario'),
         steps: [bug.steps.map((x, i) => `${i + 1}. ${x}`).join('\n')], expected: [bug.expected.map((x) => `• ${x}`).join('\n')] } as TestCase;
       const found = [bug.steps.length && `${bug.steps.length} steps`, bug.expected.length && `${bug.expected.length} expected result${bug.expected.length === 1 ? '' : 's'}`, bug.url && `page ${bug.url}`].filter(Boolean).join(', ');
       const msg = found ? `Read the report: ${found}. Check the fields below, then save.` : 'Could not find the sections in that text. Look for "Steps to reproduce:" and "Expected result:" headings, or fill the fields by hand.';
-      return send(res, 200, issueFormPage(s, editing, msg, filled));
+      return send(res, 200, issueFormPage(s, editing, msg, filled, pageOptions()));
     }
 
     // Add or edit one issue.
@@ -252,7 +272,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       // Show the form again with what was typed, so nothing is lost.
       const typed = { ...s.cases.find((c) => c.id === targetId), title: field(form, 'title'), url: field(form, 'url'), reported: field(form, 'actual'),
         expected: [field(form, 'expected')], steps: [field(form, 'steps')], priority: field(form, 'priority'), scenario: field(form, 'scenario'), preconditions: field(form, 'preconditions') };
-      return send(res, 422, issueFormPage(s, targetId ? (typed as TestCase) : undefined, tc, { ...typed, id: field(form, 'id') } as TestCase));
+      return send(res, 422, issueFormPage(s, targetId ? (typed as TestCase) : undefined, tc, { ...typed, id: field(form, 'id') } as TestCase, pageOptions()));
     }
     const cases = targetId ? s.cases.map((c) => (c.id === targetId ? tc : c)) : [...s.cases, tc];
     suites.save({ ...s, cases, removed: (s.removed ?? []).filter((id) => id !== tc.id) });
@@ -278,6 +298,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       const run: Run = { id: newId(), suiteId: s.id, suiteName: s.name, caseIds: ids, status: 'queued', results: [], createdAt: new Date().toISOString() };
       enqueue(run);
       return redirect(res, `/runs/${run.id}`);
+    }
+    if (m[2] === 'sync' && s.source.kind === 'site') {
+      const fresh = syncSiteSuite();
+      return redirect(res, `/suites/${s.id}?msg=${encodeURIComponent(fresh ? `Rebuilt ${plural(fresh.cases.length, 'case')} from the site map.` : 'There is no site map yet.')}`);
     }
     if (m[2] === 'sync') {
       try {
@@ -381,6 +405,21 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   return send(res, 404, notFound());
 }
 
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** What the Suites page shows about the whole-dashboard check: the site map, a crawl in progress, the suite. */
+function siteInfo(msg?: string): SiteInfo {
+  const map = loadSiteMap();
+  return {
+    generatedAt: map?.generatedAt, pages: map?.pages.filter((x) => !x.redirectsTo).length ?? 0, stale: siteMapAge(map) > 7,
+    crawling: crawlState.running ? { pages: crawlState.pages, startedAt: crawlState.startedAt! } : undefined,
+    error: crawlState.error, suiteId: suites.all().find((x) => x.source.kind === 'site')?.id, msg,
+  };
+}
+
+/** Known dashboard pages for the Page link picker: path and "Group › Label". */
+const pageOptions = () => knownPages().map((x) => ({ path: x.path, name: [x.group, x.label].filter(Boolean).join(' › ') }));
+
 /** Sentences in a suite no rule understands, and the AI rewrites that exist for this suite's sentences. */
 function rewriteState(s: Suite): { unknown: { kind: string; text: string; cases: string[] }[]; rows: RewriteRow[]; pending: RewriteRow[] } {
   const all = loadTranslations();
@@ -394,17 +433,20 @@ function rewriteState(s: Suite): { unknown: { kind: string; text: string; cases:
       ...c.steps.flatMap((x) => stepPieces(x)).map((x) => ({ kind: 'step' as const, text: x })),
       ...c.expected.flatMap((e) => expectClauses(e)).map((x) => ({ kind: 'expect' as const, text: x })),
     ];
+    // Rewrites are saved per page (newer) or per sentence (older); the case's page picks the right one.
+    const page = c.url || s.pagePath;
     for (const u of [...p.unknown, ...sentences]) {
-      const key = keyOf(u.kind, u.text);
-      if (all[key]) {
-        const row = rowMap.get(key) ?? { key, t: all[key], cases: [] };
+      const hit = lookup(all, u.kind, u.text, page);
+      if (hit) {
+        const key = hit.key;
+        const row = rowMap.get(key) ?? { key, t: hit.t, cases: [] };
         if (!row.cases.includes(c.id)) row.cases.push(c.id);
         rowMap.set(key, row);
       }
     }
     for (const u of p.unknown) {
+      if (lookup(all, u.kind, u.text, page)) continue;
       const key = keyOf(u.kind, u.text);
-      if (all[key]) continue;
       const e = unknownMap.get(key) ?? { kind: u.kind, text: u.text, cases: [] };
       if (!e.cases.includes(c.id)) e.cases.push(c.id);
       unknownMap.set(key, e);

@@ -1,0 +1,5821 @@
+{
+ "generatedAt": "2026-10-23T06:07:42.633Z",
+ "tookMs": 337501,
+ "pages": [
+  {
+   "path": "/dashboard",
+   "title": "Dashboard",
+   "label": "Dashboard",
+   "group": "",
+   "headings": [],
+   "tabs": [],
+   "buttons": [
+    "More insights"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "report",
+   "depth": 0
+  },
+  {
+   "path": "/dashboard/pos",
+   "title": "Create Order/POS",
+   "label": "Create Order/POS",
+   "group": "Sales",
+   "section": "Sell",
+   "headings": [],
+   "tabs": [],
+   "buttons": [
+    "Main Warehouse",
+    "Customer",
+    "Held orders",
+    "All",
+    "Select",
+    "Add",
+    "Out of stock"
+   ],
+   "fields": [
+    "Search or scan products"
+   ],
+   "columns": [],
+   "filters": [],
+   "search": "Search products or scan barcode…",
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/orders",
+   "title": "Orders",
+   "label": "Orders",
+   "group": "Sales",
+   "section": "Sell",
+   "headings": [
+    "Orders"
+   ],
+   "tabs": [
+    "All",
+    "Draft",
+    "Pending",
+    "Processing",
+    "Completed",
+    "Cancelled",
+    "Refunded"
+   ],
+   "sections": [
+    "Orders",
+    "To pack",
+    "Overview",
+    "Order Links",
+    "Exchanges",
+    "Shipping Labels",
+    "Coupons"
+   ],
+   "buttons": [
+    "Sell now",
+    "Bulk create",
+    "Pending",
+    "Processing",
+    "Sales",
+    "Collected",
+    "Due",
+    "Discount",
+    "Sort",
+    "Filter",
+    "Export all",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER #",
+    "CUSTOMER",
+    "PRODUCTS",
+    "TOTAL",
+    "DISCOUNT",
+    "PAID / DUE",
+    "STATUS",
+    "FULFILLMENT",
+    "SOURCE",
+    "PLACED BY",
+    "ACTIONS"
+   ],
+   "filters": [
+    "SOURCE",
+    "FULFILLMENT",
+    "ORDER DATE",
+    "Possible duplicates only",
+    "Pre-orders only",
+    "Held for review only",
+    "Show archived only"
+   ],
+   "search": "Order # or customer name…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/products",
+   "title": "Products",
+   "label": "Products",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Products"
+   ],
+   "tabs": [
+    "All",
+    "Active",
+    "Draft",
+    "Archived"
+   ],
+   "sections": [
+    "Products",
+    "Pre-orders",
+    "Sizes & colours",
+    "Media",
+    "Reviews"
+   ],
+   "buttons": [
+    "Add Product",
+    "Bulk Create",
+    "Breakdown",
+    "Sort",
+    "Filter",
+    "Export all",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "PRICE",
+    "STOCK",
+    "SKU",
+    "CATEGORY",
+    "BRAND",
+    "SOLD",
+    "STATUS",
+    "ACTIONS"
+   ],
+   "filters": [
+    "STOCK",
+    "CATEGORY"
+   ],
+   "search": "Search products…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/customers",
+   "title": "Customers",
+   "label": "Customers",
+   "group": "Customers",
+   "section": "Sell",
+   "headings": [
+    "Customers"
+   ],
+   "tabs": [],
+   "sections": [
+    "Customers List",
+    "Customer Labels",
+    "Customer dues",
+    "Reminders"
+   ],
+   "buttons": [
+    "New customer",
+    "Customer dues",
+    "AI report",
+    "Bulk create",
+    "Sort",
+    "Filter",
+    "Export all",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "NAME",
+    "LABELS",
+    "PHONE",
+    "EMAIL",
+    "BIRTHDAY",
+    "OUTSTANDING",
+    "CREDIT LIMIT",
+    "ACTIONS"
+   ],
+   "filters": [
+    "Only customers who have ordered",
+    "Only customers with a birthday saved"
+   ],
+   "search": "Search customers…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/cashbook",
+   "title": "Cashbook",
+   "label": "Accounts",
+   "group": "Cashbook",
+   "section": "Money",
+   "headings": [
+    "Cashbook",
+    "My business transactions",
+    "My financials"
+   ],
+   "tabs": [
+    "All records",
+    "Cash only"
+   ],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Cash In",
+    "Cash Out",
+    "Add Operational Cost",
+    "Today",
+    "Yesterday",
+    "This week",
+    "Last 7 days",
+    "This month",
+    "Custom",
+    "Net profit",
+    "Net cash flow",
+    "Count cash",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [
+    "Follow date filter"
+   ],
+   "columns": [
+    "SL",
+    "ENTRY",
+    "TIME",
+    "AMOUNT",
+    "DUE",
+    "STATUS"
+   ],
+   "filters": [
+    "TYPE",
+    "STATUS",
+    "CATEGORY",
+    "PARTY",
+    "DATE"
+   ],
+   "search": "Search notes/reference…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory",
+   "title": "Inventory",
+   "label": "Stock",
+   "group": "Stock",
+   "section": "Stock",
+   "headings": [
+    "Inventory"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "Quick receive",
+    "Adjust stock",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "WAREHOUSE",
+    "STORAGE CODE",
+    "INITIAL STOCK",
+    "RESERVED",
+    "AVAILABLE",
+    "THRESHOLD",
+    "SOLD",
+    "ACTIONS"
+   ],
+   "filters": [
+    "Low stock only",
+    "WAREHOUSE"
+   ],
+   "search": "Search product / SKU…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports",
+   "title": "Reports",
+   "label": "All reports",
+   "group": "Reports",
+   "section": "Analyze",
+   "headings": [
+    "Reports",
+    "Revenue · Gross profit over time",
+    "Sales",
+    "Customers",
+    "Inventory Analytics",
+    "Channel",
+    "Delivery",
+    "Financial"
+   ],
+   "tabs": [],
+   "buttons": [
+    "CSV"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=sales-trends",
+   "title": "Sales trends",
+   "label": "Sales trends",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Sales trends",
+   "headings": [
+    "Sales trends",
+    "Revenue · Gross profit over time",
+    "Orders over time",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PERIOD",
+    "ORDERS",
+    "REVENUE",
+    "PAID",
+    "ITEM COST",
+    "GROSS PROFIT"
+   ],
+   "filters": [
+    "GROUP BY"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=sales-by-geography",
+   "title": "Sales by geography",
+   "label": "Sales by geography",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Sales by geography",
+   "headings": [
+    "Sales by geography",
+    "Top 10 by Revenue",
+    "Orders by District",
+    "Top 10 by Return rate",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "DISTRICT",
+    "ORDERS",
+    "REVENUE",
+    "AVG. ORDER VALUE",
+    "RETURNED",
+    "RETURN RATE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=order-status",
+   "title": "Order status distribution",
+   "label": "Order status distribution",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Order status distribution",
+   "headings": [
+    "Order status distribution",
+    "Orders by Status",
+    "Top 6 by Revenue",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "STATUS",
+    "ORDERS",
+    "REVENUE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=order-fulfillment",
+   "title": "Fulfillment distribution",
+   "label": "Fulfillment distribution",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Fulfillment distribution",
+   "headings": [
+    "Fulfillment distribution",
+    "Orders by Fulfillment status",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "FULFILLMENT STATUS",
+    "ORDERS"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=order-cancellations",
+   "title": "Cancellations & refunds",
+   "label": "Cancellations & refunds",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Cancellations & refunds",
+   "headings": [
+    "Cancellations & refunds",
+    "Cancellation rate",
+    "Cancelled · Refunded",
+    "Cancelled value · Refunded value",
+    "Nothing here yet"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=sales-by-product",
+   "title": "Sales by product",
+   "label": "Sales by product",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Sales by product",
+   "headings": [
+    "Sales by product",
+    "Top 10 by Revenue",
+    "Top 10 by Gross margin",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "UNITS SOLD",
+    "REVENUE",
+    "ORDERS",
+    "ITEM COST",
+    "GROSS MARGIN",
+    "MARGIN"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=order-cancelled-returns",
+   "title": "Cancelled & returned orders",
+   "label": "Cancelled & returned orders",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Cancelled & returned orders",
+   "headings": [
+    "Cancelled & returned orders",
+    "Count by Status",
+    "Total over time",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "CUSTOMER",
+    "STATUS",
+    "TOTAL",
+    "DATE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=sales-by-fulfillment-type",
+   "title": "Delivery vs pickup",
+   "label": "Delivery vs pickup",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Delivery vs pickup",
+   "headings": [
+    "Delivery vs pickup",
+    "Revenue by Fulfillment type",
+    "Orders by Fulfillment type",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "FULFILLMENT TYPE",
+    "ORDERS",
+    "REVENUE",
+    "AVG. ORDER VALUE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=sales-by-hour",
+   "title": "Sales by hour & weekday",
+   "label": "Sales by hour & weekday",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Sales › Sales by hour & weekday",
+   "headings": [
+    "Sales by hour & weekday",
+    "Orders by Hour",
+    "Revenue by Weekday",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "WEEKDAY",
+    "HOUR",
+    "ORDERS",
+    "REVENUE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/searches",
+   "title": "What customers searched for",
+   "label": "What customers searched for",
+   "group": "Reports › Sales",
+   "section": "Analyze",
+   "breadcrumb": "Reports › What customers searched for",
+   "headings": [
+    "What customers searched for",
+    "Nothing missed"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Sort",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [
+    "SHOW",
+    "SEARCHED FROM"
+   ],
+   "search": "Search what customers typed…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=customer-retention",
+   "title": "New vs. repeat customers",
+   "label": "New vs. repeat customers",
+   "group": "Reports › Customers",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Customers › New vs. repeat customers",
+   "headings": [
+    "New vs. repeat customers",
+    "Repeat rate",
+    "New customers · Repeat customers",
+    "Top 10 by Total orders",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CUSTOMER",
+    "PHONE",
+    "TYPE",
+    "ORDERS",
+    "TOTAL ORDERS",
+    "LAST ORDER"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=customer-lifetime-value",
+   "title": "Customer lifetime value",
+   "label": "Customer lifetime value",
+   "group": "Reports › Customers",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Customers › Customer lifetime value",
+   "headings": [
+    "Customer lifetime value",
+    "Top 10 by Total spent",
+    "Top 10 by Orders",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CUSTOMER",
+    "EMAIL",
+    "TOTAL SPENT",
+    "ORDERS"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=abandoned-orders",
+   "title": "Abandoned & incomplete orders",
+   "label": "Abandoned & incomplete orders",
+   "group": "Reports › Customers",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Customers › Abandoned & incomplete orders",
+   "headings": [
+    "Abandoned & incomplete orders",
+    "Total over time",
+    "Top 1 by Total",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CUSTOMER",
+    "CREATED",
+    "TOTAL",
+    "ITEMS"
+   ],
+   "filters": [
+    "WINDOW"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-stock-summary",
+   "title": "Stock summary",
+   "label": "Stock summary",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Stock summary",
+   "headings": [
+    "Stock summary",
+    "Available · Reserved",
+    "Low stock · Out of stock",
+    "Nothing here yet"
+   ],
+   "tabs": [],
+   "buttons": [
+    "CSV",
+    "Filter",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-low-stock",
+   "title": "Low stock",
+   "label": "Low stock",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Low stock",
+   "headings": [
+    "Low stock",
+    "Available · Threshold by Product",
+    "Count by Status",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "ON HAND",
+    "RESERVED",
+    "AVAILABLE",
+    "THRESHOLD",
+    "STATUS"
+   ],
+   "filters": [
+    "WAREHOUSE"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-movements",
+   "title": "Stock movements",
+   "label": "Stock movements",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Stock movements",
+   "headings": [
+    "Stock movements",
+    "In · Out over time",
+    "Net over time",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PERIOD",
+    "IN",
+    "OUT",
+    "NET"
+   ],
+   "filters": [
+    "GROUP BY",
+    "WAREHOUSE"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-reorder",
+   "title": "Reorder forecast",
+   "label": "Reorder forecast",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Reorder forecast",
+   "headings": [
+    "Reorder forecast",
+    "Lowest 10 by Days of cover",
+    "Top 10 by Suggested reorder",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "ON HAND",
+    "DAILY SALES RATE",
+    "DAYS OF COVER",
+    "SUGGESTED REORDER"
+   ],
+   "filters": [
+    "WINDOW"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-fast-moving",
+   "title": "Fast-moving products",
+   "label": "Fast-moving products",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Fast-moving products",
+   "headings": [
+    "Fast-moving products",
+    "Top 10 by Units out",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "UNITS OUT",
+    "DAILY SALES RATE"
+   ],
+   "filters": [
+    "WINDOW"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-dead-stock",
+   "title": "Dead stock",
+   "label": "Dead stock",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Dead stock",
+   "headings": [
+    "Dead stock",
+    "Top 7 by On hand",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "ON HAND",
+    "LAST SOLD"
+   ],
+   "filters": [
+    "WINDOW"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-turnover",
+   "title": "Inventory turnover",
+   "label": "Inventory turnover",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Inventory turnover",
+   "headings": [
+    "Inventory turnover",
+    "Top 10 by Turnover ratio",
+    "Top 10 by Units in · Units out",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "UNITS IN",
+    "UNITS OUT",
+    "TURNOVER RATIO"
+   ],
+   "filters": [
+    "WINDOW"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-aging",
+   "title": "Inventory aging",
+   "label": "Inventory aging",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › Inventory aging",
+   "headings": [
+    "Inventory aging",
+    "On hand by Aging bucket",
+    "Top 10 by Age",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "ON HAND",
+    "AGE",
+    "AGING BUCKET",
+    "LAST RECEIVED"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=inventory-abc",
+   "title": "ABC Analysis",
+   "label": "ABC Analysis",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Inventory Analytics › ABC Analysis",
+   "headings": [
+    "ABC Analysis",
+    "Units out by Classification",
+    "Top 10 by Units out",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "CLASSIFICATION",
+    "UNITS OUT",
+    "CUMULATIVE"
+   ],
+   "filters": [
+    "WINDOW"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/analytics/inventory/health",
+   "title": "Inventory health",
+   "label": "Inventory Health",
+   "group": "Reports › Inventory Analytics",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Analytics › Inventory health",
+   "headings": [
+    "Inventory health",
+    "SKUs",
+    "Warehouse stock heatmap"
+   ],
+   "tabs": [],
+   "buttons": [
+    "CSV"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=orders-by-channel",
+   "title": "Orders by channel",
+   "label": "Orders by channel",
+   "group": "Reports › Channel",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Channel › Orders by channel",
+   "headings": [
+    "Orders by channel",
+    "Orders by Channel",
+    "Top 7 by Revenue",
+    "Top 7 by Return rate",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CHANNEL",
+    "ORDERS",
+    "REVENUE",
+    "RETURNED",
+    "RETURN RATE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=returns-by-channel",
+   "title": "Returns by channel",
+   "label": "Returns by channel",
+   "group": "Reports › Channel",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Channel › Returns by channel",
+   "headings": [
+    "Returns by channel",
+    "Top 6 by Return rate",
+    "Returned by Channel",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CHANNEL",
+    "DELIVERED",
+    "RETURNED",
+    "RETURN RATE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=orders-by-traffic-source",
+   "title": "Orders by traffic source",
+   "label": "Orders by traffic source",
+   "group": "Reports › Channel",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Channel › Orders by traffic source",
+   "headings": [
+    "Orders by traffic source",
+    "Orders by Traffic source",
+    "Top 1 by Revenue",
+    "Top 1 by Return rate",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "TRAFFIC SOURCE",
+    "ORDERS",
+    "REVENUE",
+    "RETURNED",
+    "RETURN RATE"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=orders-peak-hours",
+   "title": "Peak order hours",
+   "label": "Peak order hours",
+   "group": "Reports › Channel",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Channel › Peak order hours",
+   "headings": [
+    "Peak order hours",
+    "Orders by Hour",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "HOUR",
+    "ORDERS"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=courier-performance",
+   "title": "Courier performance",
+   "label": "Courier performance",
+   "group": "Reports › Delivery",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Delivery › Courier performance",
+   "headings": [
+    "Courier performance",
+    "Top 2 by Assigned · Delivered",
+    "Top 2 by Delivered rate",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "COURIER",
+    "TYPE",
+    "ASSIGNED",
+    "DELIVERED",
+    "DELIVERED RATE",
+    "AVG. DELIVERY TIME"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=cod-success-rate",
+   "title": "COD success rate",
+   "label": "COD success rate",
+   "group": "Reports › Delivery",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Delivery › COD success rate",
+   "headings": [
+    "COD success rate",
+    "Success rate",
+    "Orders by Status",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "STATUS",
+    "ORDERS",
+    "TOTAL"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=cash-flow",
+   "title": "Cash flow",
+   "label": "Cash flow",
+   "group": "Reports › Financial",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Financial › Cash flow",
+   "headings": [
+    "Cash flow",
+    "Income · Expense over time",
+    "Net over time",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PERIOD",
+    "INCOME",
+    "EXPENSE",
+    "NET"
+   ],
+   "filters": [
+    "GROUP BY"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=cash-book",
+   "title": "Cash book",
+   "label": "Cash book",
+   "group": "Reports › Financial",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Financial › Cash book",
+   "headings": [
+    "Cash book",
+    "Debit · Credit over time",
+    "Balance over time",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "DATE",
+    "DETAILS",
+    "DEBIT",
+    "CREDIT",
+    "BALANCE",
+    "PARTY",
+    "DONE BY",
+    "CATEGORY"
+   ],
+   "filters": [
+    "DIRECTION"
+   ],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reports/view?slug=sales-by-payment-type",
+   "title": "Sales by payment type",
+   "label": "Sales by payment type",
+   "group": "Reports › Financial",
+   "section": "Analyze",
+   "breadcrumb": "Reports › Financial › Sales by payment type",
+   "headings": [
+    "Sales by payment type",
+    "Amount by Payment type",
+    "Payments by Payment type",
+    "Detailed breakdown"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "CSV",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PAYMENT TYPE",
+    "PAYMENTS",
+    "AMOUNT"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/orders/dashboard",
+   "title": "Order performance",
+   "label": "Sales overview",
+   "group": "Performance",
+   "section": "Analyze",
+   "breadcrumb": "Orders › Performance",
+   "headings": [
+    "Order performance",
+    "Order progress",
+    "Orders waiting on you",
+    "Daily orders by outcome",
+    "Where orders come from",
+    "When customers order",
+    "Why orders come back",
+    "Returns by area",
+    "Returns by channel",
+    "Courier delivery performance"
+   ],
+   "tabs": [
+    "Today",
+    "7 days",
+    "30 days"
+   ],
+   "sections": [
+    "Orders",
+    "To pack",
+    "Overview",
+    "Order Links",
+    "Exchanges",
+    "Shipping Labels",
+    "Coupons"
+   ],
+   "buttons": [
+    "Open orders",
+    "Confirm pending"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/dashboard",
+   "title": "Inventory performance",
+   "label": "Stock overview",
+   "group": "Performance",
+   "section": "Analyze",
+   "breadcrumb": "Inventory › Performance",
+   "headings": [
+    "Inventory performance",
+    "How your stock value changed",
+    "Stock health",
+    "Will your bestsellers run out?",
+    "Needs your attention",
+    "Stock vs sales by category",
+    "Top sellers",
+    "Dead stock · money sitting on shelves"
+   ],
+   "tabs": [
+    "7 days",
+    "30 days",
+    "90 days"
+   ],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "Create purchase order",
+    "Export",
+    "Run an offer"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/dashboard",
+   "title": "Money overview",
+   "label": "Money overview",
+   "group": "Performance",
+   "section": "Analyze",
+   "breadcrumb": "Money › Overview",
+   "headings": [
+    "Money overview",
+    "Sales to net profit",
+    "Cash in vs cash out",
+    "Category-wise expenses",
+    "Product-wise profit",
+    "Money with couriers",
+    "How customers pay",
+    "Which channel actually makes money",
+    "Needs your attention"
+   ],
+   "tabs": [
+    "Today",
+    "7 days",
+    "30 days"
+   ],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Reconcile COD",
+    "Export",
+    "Chart",
+    "View all line items"
+   ],
+   "fields": [],
+   "columns": [
+    "PRODUCT",
+    "SOLD / ORDERS",
+    "REVENUE",
+    "PRODUCT COST",
+    "OpEx",
+    "PROFIT",
+    "MARGIN",
+    "PER UNIT"
+   ],
+   "filters": [],
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/orders/links",
+   "title": "Order links",
+   "label": "Order Links",
+   "group": "Sales",
+   "section": "Sell",
+   "breadcrumb": "Orders › Order links",
+   "headings": [
+    "Order links",
+    "No order links yet"
+   ],
+   "tabs": [],
+   "sections": [
+    "Orders",
+    "To pack",
+    "Overview",
+    "Order Links",
+    "Exchanges",
+    "Shipping Labels",
+    "Coupons"
+   ],
+   "buttons": [
+    "Generate from held cart",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search order number, name or phone…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/orders/exchanges",
+   "title": "Exchanges",
+   "label": "Exchanges",
+   "group": "Sales",
+   "section": "Sell",
+   "headings": [
+    "Exchanges"
+   ],
+   "tabs": [
+    "All",
+    "Awaiting return",
+    "Received",
+    "Completed",
+    "Cancelled"
+   ],
+   "sections": [
+    "Orders",
+    "To pack",
+    "Overview",
+    "Order Links",
+    "Exchanges",
+    "Shipping Labels",
+    "Coupons"
+   ],
+   "buttons": [
+    "Filter",
+    "Export all",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "REPLACEMENT",
+    "COMING BACK",
+    "REASON",
+    "COLLECT",
+    "CREDIT",
+    "STATUS",
+    "CREATED"
+   ],
+   "filters": [],
+   "search": "Search order number or phone",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/customers/labels",
+   "title": "Customer Labels",
+   "label": "Customer Labels",
+   "group": "Customers",
+   "section": "Sell",
+   "breadcrumb": "Customers › Labels",
+   "headings": [
+    "Customer Labels"
+   ],
+   "tabs": [],
+   "sections": [
+    "Customers List",
+    "Customer Labels",
+    "Customer dues",
+    "Reminders"
+   ],
+   "buttons": [
+    "New label",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "LABEL",
+    "DISCOUNT",
+    "ACTIVE WINDOW",
+    "CUSTOMERS",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search labels…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reminders",
+   "title": "Reminders",
+   "label": "Reminders",
+   "group": "Customers",
+   "section": "Sell",
+   "headings": [
+    "Reminders",
+    "No reminders yet"
+   ],
+   "tabs": [],
+   "sections": [
+    "Customers List",
+    "Customer Labels",
+    "Customer dues",
+    "Reminders"
+   ],
+   "buttons": [
+    "New reminder",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [
+    "Only what’s due now"
+   ],
+   "search": "Search reminders…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=to_book",
+   "title": "Delivery",
+   "label": "To book",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery",
+    "Nothing here right now."
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Order # or customer name…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=to_pack",
+   "title": "Delivery",
+   "label": "To pack",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery"
+   ],
+   "tabs": [],
+   "sections": [
+    "Orders",
+    "To pack",
+    "Overview",
+    "Order Links",
+    "Exchanges",
+    "Shipping Labels",
+    "Coupons"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Export page",
+    "Print all labels",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "DELIVER TO",
+    "ITEMS",
+    "COLLECT ON DELIVERY",
+    "TRACKING",
+    "ACTIONS"
+   ],
+   "filters": [],
+   "search": "Order # or customer name…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=to_hand_over",
+   "title": "Delivery",
+   "label": "Give to courier",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery",
+    "Nothing here right now."
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Export page",
+    "Print all labels",
+    "Scan to hand over",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Order # or customer name…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=in_delivery",
+   "title": "Delivery",
+   "label": "In delivery",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery"
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "DELIVER TO",
+    "COLLECT ON DELIVERY",
+    "TRACKING",
+    "FULFILLMENT"
+   ],
+   "filters": [],
+   "search": "Order # or customer name…",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=failed",
+   "title": "Delivery",
+   "label": "Failed",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery",
+    "Nothing here right now."
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Order # or customer name…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=delivered",
+   "title": "Delivery",
+   "label": "Delivered",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery"
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "DELIVER TO",
+    "COLLECT ON DELIVERY",
+    "TRACKING",
+    "FULFILLMENT"
+   ],
+   "filters": [],
+   "search": "Order # or customer name…",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=returned",
+   "title": "Delivery",
+   "label": "Returned",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery"
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "DELIVER TO",
+    "COLLECT ON DELIVERY",
+    "TRACKING",
+    "FULFILLMENT"
+   ],
+   "filters": [],
+   "search": "Order # or customer name…",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipments?stage=all",
+   "title": "Delivery",
+   "label": "All shipments",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Home › Delivery",
+   "headings": [
+    "Delivery"
+   ],
+   "tabs": [
+    "All",
+    "Dispatching",
+    "Requested",
+    "Picked up",
+    "On the way to delivery",
+    "Out for delivery",
+    "On hold",
+    "Delivered",
+    "Partially delivered",
+    "Returned",
+    "Cancelled",
+    "Dispatch failed"
+   ],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Refresh from courier",
+    "Show",
+    "To book",
+    "To pack",
+    "Give to courier",
+    "In delivery",
+    "Failed",
+    "Delivered",
+    "Returned",
+    "All shipments",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "CUSTOMER",
+    "COURIER",
+    "TRACKING CODE",
+    "STATUS",
+    "COD AMOUNT",
+    "LAST UPDATE",
+    "ACTIONS"
+   ],
+   "filters": [
+    "Needs attention",
+    "Show archived only"
+   ],
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/couriers",
+   "title": "Couriers",
+   "label": "Couriers",
+   "group": "Delivery",
+   "section": "Sell",
+   "headings": [
+    "Couriers"
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Connect a new courier",
+    "Add a manual courier",
+    "Edit",
+    "Delete courier"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipping/zones",
+   "title": "Shipping Zones",
+   "label": "Shipping Charges",
+   "group": "Delivery",
+   "section": "Sell",
+   "headings": [
+    "Shipping Zones"
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Sort",
+    "Export",
+    "Add Zone",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ZONE",
+    "LOCATIONS",
+    "DEFAULT COURIER",
+    "DELIVERY CHARGES",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search zones…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/shipping/automation",
+   "title": "Delivery Automation",
+   "label": "Automation",
+   "group": "Delivery",
+   "section": "Sell",
+   "breadcrumb": "Delivery › Automation",
+   "headings": [
+    "Delivery Automation"
+   ],
+   "tabs": [],
+   "sections": [
+    "Shipments",
+    "Couriers",
+    "Shipping Charges",
+    "Automation"
+   ],
+   "buttons": [
+    "Save changes"
+   ],
+   "fields": [
+    "Minimum delivery rate",
+    "Booking schedule",
+    "Wait before booking (minutes)"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/orders/campaign-links",
+   "title": "Campaign links",
+   "label": "Campaign Links",
+   "group": "Campaigns",
+   "section": "Sell",
+   "breadcrumb": "Campaigns › Campaign links",
+   "headings": [
+    "Campaign links"
+   ],
+   "tabs": [],
+   "sections": [
+    "Campaign Links",
+    "SMS & WhatsApp"
+   ],
+   "buttons": [
+    "New campaign",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CAMPAIGN",
+    "ITEMS",
+    "VIEWS",
+    "ORDERS",
+    "CONVERSION",
+    "SALES VALUE",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search name or channel…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/campaigns",
+   "title": "SMS & WhatsApp campaigns",
+   "label": "SMS & WhatsApp",
+   "group": "Campaigns",
+   "section": "Sell",
+   "breadcrumb": "Campaigns › SMS & WhatsApp campaigns",
+   "headings": [
+    "SMS & WhatsApp campaigns"
+   ],
+   "tabs": [],
+   "sections": [
+    "Campaign Links",
+    "SMS & WhatsApp"
+   ],
+   "buttons": [
+    "New campaign",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CAMPAIGN",
+    "CHANNEL",
+    "STATUS",
+    "RECIPIENTS",
+    "SENT",
+    "CLICKS",
+    "ORDERS",
+    "REVENUE",
+    "CREATED"
+   ],
+   "filters": [],
+   "search": "Search campaigns…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inbox/overview",
+   "title": "Social overview",
+   "label": "Social overview",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Social overview",
+    "Needs you now",
+    "Highlights",
+    "Inbox",
+    "Feeds",
+    "Activity by day",
+    "Busy hours",
+    "Top posts",
+    "What people ask",
+    "Pages and accounts"
+   ],
+   "tabs": [
+    "7 days",
+    "30 days",
+    "90 days"
+   ],
+   "sections": [
+    "Social overview",
+    "Inbox",
+    "AI bot",
+    "Analytics",
+    "Bot health",
+    "Channels"
+   ],
+   "buttons": [
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PAGE OR ACCOUNT",
+    "NEW CHATS",
+    "CUSTOMER MESSAGES",
+    "COMMENTS",
+    "WAITING NOW"
+   ],
+   "filters": [],
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inbox",
+   "title": "Inbox",
+   "label": "Inbox",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Inbox",
+    "Pick a chat"
+   ],
+   "tabs": [
+    "All messages",
+    "intelicasoft",
+    "omnichanel page"
+   ],
+   "sections": [
+    "Social overview",
+    "Inbox",
+    "AI bot",
+    "Analytics",
+    "Bot health",
+    "Channels"
+   ],
+   "buttons": [
+    "Channels",
+    "Filters",
+    "Unread",
+    "Needs reply",
+    "Anik Rifat"
+   ],
+   "fields": [
+    "Search chats"
+   ],
+   "columns": [],
+   "filters": [],
+   "search": "Search chats",
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inbox/comments",
+   "title": "Feeds",
+   "label": "Feeds",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Feeds",
+    "No comments yet"
+   ],
+   "tabs": [
+    "All",
+    "Flagged",
+    "Hidden",
+    "Needs reply",
+    "Leads"
+   ],
+   "sections": [
+    "Feeds",
+    "Posts",
+    "Comment automations",
+    "Comment AI",
+    "Comment results"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search comments or names",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inbox/settings/channels",
+   "title": "Channels",
+   "label": "Channels",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Channels"
+   ],
+   "tabs": [],
+   "sections": [
+    "Social overview",
+    "Inbox",
+    "AI bot",
+    "Analytics",
+    "Bot health",
+    "Channels"
+   ],
+   "buttons": [
+    "Connect with Facebook",
+    "Connect WhatsApp",
+    "Sort",
+    "Filter",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PAGE OR ACCOUNT",
+    "CHANNEL",
+    "STATUS",
+    "CONNECTED ON",
+    "ACTIONS"
+   ],
+   "filters": [],
+   "search": "Search…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/coupons",
+   "title": "Coupons",
+   "label": "Coupons",
+   "group": "",
+   "section": "Sell",
+   "headings": [
+    "Coupons"
+   ],
+   "tabs": [],
+   "sections": [
+    "Orders",
+    "To pack",
+    "Overview",
+    "Order Links",
+    "Exchanges",
+    "Shipping Labels",
+    "Coupons"
+   ],
+   "buttons": [
+    "New coupon",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "TITLE",
+    "CODE",
+    "TYPE",
+    "DISCOUNT",
+    "USED",
+    "STATUS",
+    "ACTIONS"
+   ],
+   "filters": [],
+   "search": "Search coupons…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/orders/shipping-labels",
+   "title": "Shipping Labels",
+   "label": "Shipping Label",
+   "group": "",
+   "section": "Sell",
+   "breadcrumb": "Orders › Shipping Labels",
+   "headings": [
+    "Shipping Labels"
+   ],
+   "tabs": [],
+   "sections": [
+    "Orders",
+    "To pack",
+    "Overview",
+    "Order Links",
+    "Exchanges",
+    "Shipping Labels",
+    "Coupons"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "DELIVER TO",
+    "COLLECT ON DELIVERY",
+    "TRACKING",
+    "FULFILLMENT",
+    "ACTIONS"
+   ],
+   "filters": [
+    "ORDER DATE",
+    "Include completed orders"
+   ],
+   "search": "Order # or customer name…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/fraud",
+   "title": "Fraud Detection",
+   "label": "Fraud Detection",
+   "group": "",
+   "section": "Sell",
+   "headings": [
+    "Fraud Detection",
+    "MD. RIfatul Islam Anik Rifat"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Verifications",
+    "Settings"
+   ],
+   "buttons": [
+    "Hold rules",
+    "Approve & confirm order",
+    "Call customer",
+    "Confirmed",
+    "No answer",
+    "Declined",
+    "Cancel order"
+   ],
+   "fields": [
+    "Trust this number, skip checks on future orders"
+   ],
+   "columns": [
+    "ORDER",
+    "COD",
+    "RISK",
+    "COURIER HISTORY",
+    "HELD BECAUSE"
+   ],
+   "filters": [],
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/products/preorders",
+   "title": "Pre-orders",
+   "label": "Pre-orders",
+   "group": "Products",
+   "section": "Stock",
+   "breadcrumb": "Products › Pre-orders",
+   "headings": [
+    "Pre-orders",
+    "Nothing on pre-order"
+   ],
+   "tabs": [],
+   "sections": [
+    "Products",
+    "Pre-orders",
+    "Sizes & colours",
+    "Media",
+    "Reviews"
+   ],
+   "buttons": [
+    "Settings",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search products…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/categories",
+   "title": "Categories",
+   "label": "Categories",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Categories"
+   ],
+   "tabs": [],
+   "buttons": [
+    "New category",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CATEGORY",
+    "PARENT",
+    "PRODUCTS",
+    "FEATURED",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search categories…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/brands",
+   "title": "Brands",
+   "label": "Brands",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Brands"
+   ],
+   "tabs": [],
+   "buttons": [
+    "New brand",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "BRAND",
+    "PRODUCTS",
+    "FEATURED",
+    "WEBSITE",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search brands…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/labels",
+   "title": "Labels",
+   "label": "Labels",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Labels",
+    "Nothing here yet"
+   ],
+   "tabs": [],
+   "buttons": [
+    "New label",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search labels…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/products/attributes",
+   "title": "Sizes & colours",
+   "label": "Sizes & colours",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Sizes & colours"
+   ],
+   "tabs": [],
+   "sections": [
+    "Products",
+    "Pre-orders",
+    "Sizes & colours",
+    "Media",
+    "Reviews"
+   ],
+   "buttons": [
+    "New attribute",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ATTRIBUTE",
+    "VALUES",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search attributes…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/reviews",
+   "title": "Reviews",
+   "label": "Reviews",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Reviews",
+    "No reviews yet"
+   ],
+   "tabs": [
+    "All",
+    "Waiting",
+    "Approved",
+    "Rejected"
+   ],
+   "sections": [
+    "Products",
+    "Pre-orders",
+    "Sizes & colours",
+    "Media",
+    "Reviews"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [
+    "RATING",
+    "PRODUCT"
+   ],
+   "search": "Search by name or review…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/movements",
+   "title": "Stock movements",
+   "label": "Stock history",
+   "group": "Stock",
+   "section": "Stock",
+   "breadcrumb": "Inventory › Movements",
+   "headings": [
+    "Stock movements"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "WHEN",
+    "WAREHOUSE",
+    "TYPE",
+    "QUANTITY",
+    "REFERENCE",
+    "REASON"
+   ],
+   "filters": [
+    "PRODUCT",
+    "WAREHOUSE",
+    "TYPE",
+    "FROM",
+    "TO"
+   ],
+   "search": "Search reason, reference or product…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/adjustments",
+   "title": "Stock adjustments",
+   "label": "Fix stock",
+   "group": "Stock",
+   "section": "Stock",
+   "breadcrumb": "Inventory › Adjustments",
+   "headings": [
+    "Stock adjustments",
+    "Adjust on-hand stock",
+    "Adjustment history"
+   ],
+   "tabs": [
+    "Adjust",
+    "Transfer",
+    "Record waste"
+   ],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "Adjust stock",
+    "Transfer",
+    "Record waste",
+    "New adjustment",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "WHEN",
+    "WAREHOUSE",
+    "TYPE",
+    "QUANTITY",
+    "REASON"
+   ],
+   "filters": [
+    "PRODUCT",
+    "WAREHOUSE",
+    "FROM",
+    "TO"
+   ],
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/waste",
+   "title": "Waste & damage",
+   "label": "Waste List",
+   "group": "Stock",
+   "section": "Stock",
+   "breadcrumb": "Inventory › Waste",
+   "headings": [
+    "Waste & damage"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "Record waste",
+    "Restock",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "WHEN",
+    "WAREHOUSE",
+    "TYPE",
+    "QUANTITY",
+    "REASON"
+   ],
+   "filters": [
+    "PRODUCT",
+    "WAREHOUSE",
+    "FROM",
+    "TO"
+   ],
+   "search": "Search reason, reference or product…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/warehouses",
+   "title": "Warehouses",
+   "label": "Warehouses",
+   "group": "Stock",
+   "section": "Stock",
+   "breadcrumb": "Inventory › Warehouses",
+   "headings": [
+    "Warehouses"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "New warehouse",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "WAREHOUSE",
+    "MANAGER",
+    "PHONE",
+    "SKUS",
+    "ON HAND",
+    "STATUS",
+    "ACTIONS"
+   ],
+   "filters": [],
+   "search": "Search warehouses…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/cycle-counts",
+   "title": "Cycle Counts",
+   "label": "Cycle Counts",
+   "group": "Stock",
+   "section": "Stock",
+   "breadcrumb": "Inventory › Cycle Counts",
+   "headings": [
+    "Cycle Counts"
+   ],
+   "tabs": [
+    "All",
+    "Counting",
+    "Completed",
+    "Cancelled"
+   ],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "New count",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "REFERENCE",
+    "WAREHOUSE",
+    "STATUS",
+    "ITEMS",
+    "CREATED",
+    "COMPLETED"
+   ],
+   "filters": [],
+   "search": "Search reference or notes…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/registers",
+   "title": "Registers",
+   "label": "Counters",
+   "group": "Stock",
+   "section": "Stock",
+   "headings": [
+    "Registers"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "New register",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search registers…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/import",
+   "title": "Bulk stock import",
+   "label": "Bulk Import",
+   "group": "Stock",
+   "section": "Stock",
+   "breadcrumb": "Inventory › Import",
+   "headings": [
+    "Bulk stock import"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "Import 0 valid row(s)"
+   ],
+   "fields": [
+    "CSV rows: sku, warehouse, quantity",
+    "Choose CSV file"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/purchase-orders",
+   "title": "Purchase orders",
+   "label": "Purchase Orders",
+   "group": "Buying stock",
+   "section": "Stock",
+   "headings": [
+    "Purchase orders",
+    "No purchase orders yet"
+   ],
+   "tabs": [
+    "All",
+    "Requested",
+    "Quoted",
+    "Ordered",
+    "Shipped",
+    "Partially received",
+    "Received",
+    "Cancelled"
+   ],
+   "sections": [
+    "Purchase Orders",
+    "Suppliers",
+    "What to reorder",
+    "Quick Receive",
+    "Supplier delivery days"
+   ],
+   "buttons": [
+    "New purchase order",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search by reference or supplier…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/suppliers",
+   "title": "Suppliers",
+   "label": "Suppliers",
+   "group": "Buying stock",
+   "section": "Stock",
+   "headings": [
+    "Suppliers"
+   ],
+   "tabs": [
+    "All",
+    "Active",
+    "Inactive"
+   ],
+   "sections": [
+    "Purchase Orders",
+    "Suppliers",
+    "What to reorder",
+    "Quick Receive",
+    "Supplier delivery days"
+   ],
+   "buttons": [
+    "New supplier",
+    "Delivery days",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "NAME",
+    "PHONE",
+    "EMAIL",
+    "OPENING BALANCE",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search suppliers…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/purchase-orders/plan",
+   "title": "Reorder plan",
+   "label": "What to reorder",
+   "group": "Buying stock",
+   "section": "Stock",
+   "breadcrumb": "Procurement › Reorder plan",
+   "headings": [
+    "Reorder plan"
+   ],
+   "tabs": [],
+   "sections": [
+    "Purchase Orders",
+    "Suppliers",
+    "What to reorder",
+    "Quick Receive",
+    "Supplier delivery days"
+   ],
+   "buttons": [
+    "Save plan",
+    "Create purchase order",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PRODUCT",
+    "SUGGESTED",
+    "PLANNED",
+    "ORDERS",
+    "TOTAL DEMAND",
+    "IN STOCK",
+    "ON PO",
+    "TO ORDER"
+   ],
+   "filters": [
+    "Only products that need ordering",
+    "Supplier"
+   ],
+   "search": "Search product or SKU…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/receive",
+   "title": "Quick receive",
+   "label": "Quick Receive",
+   "group": "Buying stock",
+   "section": "Stock",
+   "headings": [
+    "Quick receive"
+   ],
+   "tabs": [],
+   "sections": [
+    "Purchase Orders",
+    "Suppliers",
+    "What to reorder",
+    "Quick Receive",
+    "Supplier delivery days"
+   ],
+   "buttons": [
+    "Receiving against a PO instead?"
+   ],
+   "fields": [
+    "Scan or search a product to receive"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/suppliers/lead-times",
+   "title": "Supplier delivery days",
+   "label": "Supplier delivery days",
+   "group": "Buying stock",
+   "section": "Stock",
+   "breadcrumb": "Suppliers › Supplier delivery days",
+   "headings": [
+    "Supplier delivery days",
+    "Nothing here yet"
+   ],
+   "tabs": [],
+   "sections": [
+    "Purchase Orders",
+    "Suppliers",
+    "What to reorder",
+    "Quick Receive",
+    "Supplier delivery days"
+   ],
+   "buttons": [
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search suppliers…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/inventory/barcodes",
+   "title": "Barcode / QR",
+   "label": "Barcode/QR",
+   "group": "",
+   "section": "Stock",
+   "breadcrumb": "Inventory › Barcode / QR",
+   "headings": [
+    "Barcode / QR"
+   ],
+   "tabs": [
+    "Barcode",
+    "QR code"
+   ],
+   "sections": [
+    "Overview",
+    "Stock",
+    "Stock history",
+    "Fix stock",
+    "Waste List",
+    "Warehouses",
+    "Cycle Counts",
+    "Counters",
+    "Bulk Import",
+    "Barcode/QR"
+   ],
+   "buttons": [
+    "Print labels",
+    "Scan a barcode or search by name / SKU…"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/transactions",
+   "title": "Transactions",
+   "label": "Transactions",
+   "group": "Cashbook",
+   "section": "Money",
+   "headings": [
+    "Transactions"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "DESCRIPTION",
+    "DATE",
+    "PARTY",
+    "DEBIT",
+    "CREDIT",
+    "CATEGORY",
+    "REFERENCE",
+    "AMOUNT",
+    "TYPE"
+   ],
+   "filters": [
+    "TYPE",
+    "CATEGORY",
+    "PARTY",
+    "DATE"
+   ],
+   "search": "Search notes/reference…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/income",
+   "title": "Income",
+   "label": "Income",
+   "group": "Cashbook",
+   "section": "Money",
+   "headings": [
+    "Income"
+   ],
+   "tabs": [
+    "All",
+    "Pending",
+    "Partially Paid",
+    "Paid"
+   ],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Add Income",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "DESCRIPTION",
+    "TYPE",
+    "DATE",
+    "PARTY",
+    "BILLED",
+    "DUE",
+    "STATUS"
+   ],
+   "filters": [
+    "DATE"
+   ],
+   "search": "Search incomes…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/expenses",
+   "title": "Expenses",
+   "label": "Expenses",
+   "group": "Cashbook",
+   "section": "Money",
+   "headings": [
+    "Expenses"
+   ],
+   "tabs": [
+    "All",
+    "Pending",
+    "Partially Paid",
+    "Paid"
+   ],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Add Expense",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "DESCRIPTION",
+    "DATE",
+    "PARTY",
+    "DUE",
+    "TYPE",
+    "PAID",
+    "TOTAL",
+    "STATUS"
+   ],
+   "filters": [
+    "DATE"
+   ],
+   "search": "Search expenses…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/payments",
+   "title": "Payments",
+   "label": "Payments",
+   "group": "Cashbook",
+   "section": "Money",
+   "breadcrumb": "Cashbook › Payments",
+   "headings": [
+    "Payments"
+   ],
+   "tabs": [
+    "Payments",
+    "Links",
+    "Approvals"
+   ],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Record payment",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "FOR",
+    "DATE",
+    "METHOD",
+    "AMOUNT",
+    "DIRECTION"
+   ],
+   "filters": [
+    "Direction",
+    "Method",
+    "From",
+    "To"
+   ],
+   "search": "Search reference, note or method…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/categories",
+   "title": "Categories",
+   "label": "Categories",
+   "group": "Cashbook",
+   "section": "Money",
+   "headings": [
+    "Categories"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Create Category",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "NAME",
+    "KIND"
+   ],
+   "filters": [],
+   "search": "Search categories…",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/courier-cod",
+   "title": "Money with courier",
+   "label": "Money with courier",
+   "group": "",
+   "section": "Money",
+   "breadcrumb": "Home › Cashbook › Money with courier",
+   "headings": [
+    "Money with courier"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Upload invoice",
+    "Sort",
+    "Filter",
+    "Export",
+    "Got money for all",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "COURIER",
+    "DELIVERY",
+    "DELIVERED",
+    "COLLECTED",
+    "COURIER FEE",
+    "YOU RECEIVE"
+   ],
+   "filters": [
+    "Courier",
+    "Delivered between",
+    "Already paid out"
+   ],
+   "search": "Search order or tracking no.…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/accounting/parties",
+   "title": "Dues book",
+   "label": "Dues book",
+   "group": "",
+   "section": "Money",
+   "headings": [
+    "Dues book"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Add Party",
+    "Sort",
+    "Filter",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "NAME",
+    "TYPE",
+    "CONTACT",
+    "TO GET",
+    "TO PAY"
+   ],
+   "filters": [],
+   "search": "Search parties…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/customers/due",
+   "title": "Customer dues",
+   "label": "Customer dues",
+   "group": "",
+   "section": "Money",
+   "breadcrumb": "Customers › Customer dues",
+   "headings": [
+    "Customer dues"
+   ],
+   "tabs": [
+    "All",
+    "Overdue > 3 Days",
+    "Critical > 7 Days"
+   ],
+   "sections": [
+    "Customers List",
+    "Customer Labels",
+    "Customer dues",
+    "Reminders"
+   ],
+   "buttons": [
+    "Refresh",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "CUSTOMER",
+    "PHONE / CONTACT",
+    "DUE AMOUNT",
+    "OVERDUE STATUS",
+    "OLDEST ORDER"
+   ],
+   "filters": [],
+   "search": "Search due customers by name, phone, or order…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/investors",
+   "title": "Investor Ledger",
+   "label": "Partners’ money",
+   "group": "",
+   "section": "Money",
+   "headings": [
+    "Investor Ledger"
+   ],
+   "tabs": [
+    "All",
+    "Active",
+    "Overdue",
+    "Settled",
+    "Cancelled"
+   ],
+   "buttons": [
+    "New investment",
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "INVESTOR",
+    "PRINCIPAL",
+    "RETURN",
+    "INVESTED ON",
+    "NEXT DUE",
+    "STATUS",
+    "ACTIONS"
+   ],
+   "filters": [
+    "INVESTOR",
+    "FROM",
+    "TO"
+   ],
+   "search": "Search investments…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/storefront/customize",
+   "title": "Layout",
+   "label": "Layout",
+   "group": "",
+   "section": "Store",
+   "headings": [
+    "Layout"
+   ],
+   "tabs": [
+    "Sections",
+    "Style",
+    "Pages",
+    "Settings"
+   ],
+   "buttons": [
+    "Desktop preview",
+    "Tablet preview",
+    "Mobile preview",
+    "Reload preview",
+    "Visit",
+    "Undo",
+    "Redo",
+    "More actions",
+    "Publish",
+    "Change theme",
+    "Colours",
+    "Typography & layout",
+    "Header",
+    "Footer",
+    "Product card",
+    "Buttons",
+    "Brand kit",
+    "Defaults"
+   ],
+   "fields": [
+    "Demo"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/storefront/pages",
+   "title": "Custom Pages",
+   "label": "Custom Pages",
+   "group": "",
+   "section": "Store",
+   "breadcrumb": "Home › Storefront › Custom Pages",
+   "headings": [
+    "Custom Pages"
+   ],
+   "tabs": [],
+   "sections": [
+    "Layout",
+    "Custom Pages",
+    "Blog",
+    "Store settings"
+   ],
+   "buttons": [
+    "New page",
+    "Export page"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PAGE",
+    "STATUS"
+   ],
+   "filters": [],
+   "search": "Search title or slug…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/storefront/blog",
+   "title": "Blog",
+   "label": "Blog",
+   "group": "",
+   "section": "Store",
+   "breadcrumb": "Home › Storefront › Blog",
+   "headings": [
+    "Blog",
+    "Nothing here yet"
+   ],
+   "tabs": [],
+   "sections": [
+    "Layout",
+    "Custom Pages",
+    "Blog",
+    "Store settings"
+   ],
+   "buttons": [
+    "New post",
+    "Export page"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search title or slug…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/storefront/configuration",
+   "title": "Shop domain",
+   "label": "Store settings",
+   "group": "",
+   "section": "Store",
+   "breadcrumb": "Home › Shop design › Shop domain",
+   "headings": [
+    "Shop domain"
+   ],
+   "tabs": [],
+   "sections": [
+    "Layout",
+    "Custom Pages",
+    "Blog",
+    "Store settings"
+   ],
+   "buttons": [
+    "Copy address",
+    "Open storefront",
+    "Copy target",
+    "Save address",
+    "Copy JSON",
+    "Download",
+    "Edit JSON"
+   ],
+   "fields": [
+    "Domain",
+    "How customers reach your store"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/addons",
+   "title": "Addons",
+   "label": "Addons",
+   "group": "",
+   "section": "Store",
+   "headings": [
+    "Addons"
+   ],
+   "tabs": [
+    "All",
+    "Payment gateways",
+    "Couriers",
+    "Notifications",
+    "Essentials"
+   ],
+   "buttons": [
+    "How to get credentials?",
+    "Install",
+    "Set up",
+    "Add account",
+    "Uninstall"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings",
+   "title": "Settings",
+   "label": "Store Settings",
+   "group": "Settings",
+   "section": "Settings",
+   "breadcrumb": "Home › Settings",
+   "headings": [
+    "Settings"
+   ],
+   "tabs": [],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "Country code",
+    "English",
+    "Save changes",
+    "Clear data"
+   ],
+   "fields": [
+    "Store title",
+    "Store name",
+    "my-store",
+    "Store email",
+    "Store phone",
+    "Store address",
+    "Store logo",
+    "Replace",
+    "Store Link URL",
+    "Language",
+    "Currency",
+    "Symbol position",
+    "Decimal points",
+    "Timezone"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/payments",
+   "title": "Payment settings",
+   "label": "Payments",
+   "group": "Settings",
+   "section": "Settings",
+   "breadcrumb": "Home › Settings › Payments",
+   "headings": [
+    "Payment settings",
+    "Cash & cash on delivery",
+    "Manual accounts",
+    "Gateways",
+    "No gateways yet",
+    "Checkout options"
+   ],
+   "tabs": [],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "Cash",
+    "Cash on Delivery",
+    "Add account",
+    "Install a gateway",
+    "Customer chooses the amount"
+   ],
+   "fields": [
+    "Allow advance payment (part now, rest on delivery)",
+    "How much is paid now"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/inventory",
+   "title": "Stock",
+   "label": "Stock",
+   "group": "Settings",
+   "section": "Settings",
+   "breadcrumb": "Settings › Stock",
+   "headings": [
+    "Stock"
+   ],
+   "tabs": [],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "On Delivery · reserved until delivered",
+    "Block · reject the sale line, same as the storefront",
+    "Save changes",
+    "Additional settings",
+    "One count for the whole store (PC-…-023, then PB-…-024)"
+   ],
+   "fields": [
+    "Digits",
+    "Stock deduction point",
+    "POS oversell policy",
+    "SKU style",
+    "Start from a preset",
+    "Template",
+    "Example",
+    "Counting"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/accounting",
+   "title": "Accounting",
+   "label": "Accounting",
+   "group": "Settings",
+   "section": "Settings",
+   "breadcrumb": "Settings › Accounting",
+   "headings": [
+    "Accounting"
+   ],
+   "tabs": [],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "Carry forward yesterday's closing balance",
+    "On delivery confirmed",
+    "Save changes"
+   ],
+   "fields": [
+    "Daily opening balance",
+    "Revenue recognition (COD)"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/orders",
+   "title": "Orders",
+   "label": "Orders",
+   "group": "Settings",
+   "section": "Settings",
+   "breadcrumb": "Settings › Orders",
+   "headings": [
+    "Orders"
+   ],
+   "tabs": [
+    "Point of sale",
+    "Order numbering",
+    "Customer credit",
+    "Duplicates",
+    "WhatsApp",
+    "Returns",
+    "Exchanges"
+   ],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "Delivery (ship to customer)",
+    "Save changes"
+   ],
+   "fields": [
+    "Default delivery type"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/tax",
+   "title": "Tax",
+   "label": "Tax",
+   "group": "Settings",
+   "section": "Settings",
+   "breadcrumb": "Settings › Tax",
+   "headings": [
+    "Tax",
+    "Nothing here yet"
+   ],
+   "tabs": [],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "New tax rate",
+    "Order-wise (apply to the whole order)",
+    "Select…",
+    "Additional settings",
+    "Save changes",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [
+    "Tax classes applied",
+    "Tax label",
+    "Tax calculation"
+   ],
+   "columns": [],
+   "filters": [],
+   "search": "Search tax rates…",
+   "list": true,
+   "pager": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/notifications",
+   "title": "Email notifications",
+   "label": "Email",
+   "group": "Notifications",
+   "section": "Settings",
+   "breadcrumb": "Home › Settings › Notifications › Email",
+   "headings": [
+    "Email notifications",
+    "Couldn’t load this list"
+   ],
+   "tabs": [],
+   "sections": [
+    "Email",
+    "SMS",
+    "Push",
+    "Delivery Log"
+   ],
+   "buttons": [
+    "Sort",
+    "Export",
+    "Try again",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": true,
+   "pager": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/notifications/sms",
+   "title": "SMS notifications",
+   "label": "SMS",
+   "group": "Notifications",
+   "section": "Settings",
+   "breadcrumb": "Home › Settings › Notifications › SMS",
+   "headings": [
+    "SMS notifications",
+    "Couldn’t load this list"
+   ],
+   "tabs": [],
+   "sections": [
+    "Email",
+    "SMS",
+    "Push",
+    "Delivery Log"
+   ],
+   "buttons": [
+    "Sort",
+    "Export",
+    "Try again",
+    "Rows",
+    "Choose a label",
+    "Save changes"
+   ],
+   "fields": [
+    "Send to customers with label",
+    "Send at",
+    "Message"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": true,
+   "pager": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/notifications/push",
+   "title": "Push notifications",
+   "label": "Push",
+   "group": "Notifications",
+   "section": "Settings",
+   "breadcrumb": "Home › Settings › Notifications › Push",
+   "headings": [
+    "Push notifications"
+   ],
+   "tabs": [],
+   "sections": [
+    "Email",
+    "SMS",
+    "Push",
+    "Delivery Log"
+   ],
+   "buttons": [
+    "Turn on"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/notifications/logs",
+   "title": "Delivery log",
+   "label": "Delivery Log",
+   "group": "Notifications",
+   "section": "Settings",
+   "breadcrumb": "Settings › Notifications › Delivery Log",
+   "headings": [
+    "Delivery log",
+    "Couldn’t load this list"
+   ],
+   "tabs": [],
+   "sections": [
+    "Email",
+    "SMS",
+    "Push",
+    "Delivery Log"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Try again",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [
+    "CHANNEL",
+    "STATUS"
+   ],
+   "search": "Search recipient or message…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/users",
+   "title": "Users",
+   "label": "Users",
+   "group": "Employees",
+   "section": "Settings",
+   "headings": [
+    "Users"
+   ],
+   "tabs": [],
+   "sections": [
+    "Users",
+    "Roles"
+   ],
+   "buttons": [
+    "Invite",
+    "Roles",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "NAME",
+    "ROLE",
+    "STATUS",
+    "2FA"
+   ],
+   "filters": [],
+   "search": "Search users…",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/roles",
+   "title": "Roles & permissions",
+   "label": "Roles",
+   "group": "Employees",
+   "section": "Settings",
+   "headings": [
+    "Roles & permissions"
+   ],
+   "tabs": [],
+   "sections": [
+    "Users",
+    "Roles"
+   ],
+   "buttons": [
+    "New role",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ROLE NAME",
+    "CUSTOM",
+    "PERMISSIONS",
+    "MEMBERS",
+    "ACTIVE",
+    "ACTIONS"
+   ],
+   "filters": [],
+   "search": "Search roles…",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/printing",
+   "title": "Print Settings",
+   "label": "Printing Settings",
+   "group": "",
+   "section": "Settings",
+   "breadcrumb": "Settings › Printing",
+   "headings": [
+    "Print Settings"
+   ],
+   "tabs": [
+    "Shipping labels",
+    "Product barcode labels",
+    "Product QR labels",
+    "Invoice customization",
+    "POS sale receipt"
+   ],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "Restore defaults",
+    "100 × 150 mm",
+    "Additional settings",
+    "Left",
+    "System default, no download",
+    "Normal",
+    "Right",
+    "Save changes"
+   ],
+   "fields": [
+    "Paper size",
+    "Labels per row",
+    "Label height (mm)",
+    "Page margin (mm)",
+    "Gap between labels (mm)",
+    "Text size (pt)",
+    "Text",
+    "Most lines to print",
+    "QR size (mm)",
+    "\"From\" caption",
+    "\"Deliver to\" caption",
+    "Cash-on-delivery caption",
+    "Prepaid caption",
+    "Footer line",
+    "Text alignment",
+    "Font",
+    "Text weight",
+    "Text colour",
+    "QR alignment"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/tracking",
+   "title": "Tracking & analytics",
+   "label": "Ads pixel",
+   "group": "",
+   "section": "Settings",
+   "breadcrumb": "Home › Settings › Ads pixel",
+   "headings": [
+    "Tracking & analytics"
+   ],
+   "tabs": [],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "Replace",
+    "Disconnect",
+    "Save changes",
+    "Install",
+    "Copy"
+   ],
+   "fields": [
+    "Pixel ID",
+    "Test event code(optional)",
+    "Conversions API access token",
+    "Measurement ID",
+    "Measurement Protocol API secret",
+    "Container ID",
+    "Conversion ID",
+    "Conversion label",
+    "My GTM container already sends GA4 events"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/integrations",
+   "title": "Channel integrations",
+   "label": "Integrations",
+   "group": "",
+   "section": "Settings",
+   "headings": [
+    "Channel integrations",
+    "No channels connected"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Connect channel",
+    "Install the Daraz addon"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/developers",
+   "title": "Developers",
+   "label": "Developers",
+   "group": "",
+   "section": "Settings",
+   "headings": [
+    "Developers",
+    "API keys",
+    "No API keys yet",
+    "Webhooks",
+    "No webhooks yet",
+    "Build your own storefront with AI",
+    "Documentation"
+   ],
+   "tabs": [
+    "Live",
+    "Sandbox"
+   ],
+   "buttons": [
+    "New API key",
+    "Sort",
+    "Filter",
+    "Export",
+    "Rows",
+    "Add webhook",
+    "Copy",
+    "Copy prompt",
+    "Download AGENTS.md (full)",
+    "Download core brief",
+    "Open the guide",
+    "Add",
+    "Open API docs",
+    "OpenAPI file"
+   ],
+   "fields": [
+    "Website address"
+   ],
+   "columns": [],
+   "filters": [],
+   "search": "Search keys",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/activity",
+   "title": "Activity log",
+   "label": "Activity Log",
+   "group": "",
+   "section": "Settings",
+   "headings": [
+    "Activity log"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "WHEN",
+    "WHO",
+    "ACTION",
+    "RECORD",
+    "CHANGED"
+   ],
+   "filters": [
+    "STAFF MEMBER",
+    "ACTION",
+    "RECORD TYPE"
+   ],
+   "search": "Search record or staff name…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/settings/layout",
+   "title": "Layout settings",
+   "label": "Layout settings",
+   "group": "",
+   "section": "Settings",
+   "breadcrumb": "Home › Layout settings",
+   "headings": [
+    "Layout settings"
+   ],
+   "tabs": [],
+   "sections": [
+    "Store Settings",
+    "Payments",
+    "Stock",
+    "Accounting",
+    "Orders",
+    "Tax",
+    "Printing",
+    "Ads pixel",
+    "Layout settings"
+   ],
+   "buttons": [
+    "Reset to default",
+    "Dark",
+    "Move Dashboard up",
+    "Move Dashboard down",
+    "Unpin Dashboard",
+    "Move Create Order/POS up",
+    "Move Create Order/POS down",
+    "Unpin Create Order/POS",
+    "Move Orders up",
+    "Move Orders down",
+    "Unpin Orders",
+    "Move Products up",
+    "Move Products down",
+    "Unpin Products",
+    "Move Customers List up",
+    "Move Customers List down",
+    "Unpin Customers List",
+    "Move Accounts up",
+    "Move Accounts down",
+    "Unpin Accounts",
+    "Move Stock up",
+    "Move Stock down",
+    "Unpin Stock",
+    "Analyze",
+    "Sell",
+    "Stock",
+    "Money",
+    "Store",
+    "Settings"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search menu items by name or keyword…",
+   "list": false,
+   "kind": "settings",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/download-app",
+   "title": "Download App",
+   "label": "Download App",
+   "group": "",
+   "section": "Settings",
+   "breadcrumb": "Dashboard › Download App",
+   "headings": [
+    "Download App",
+    "ShopLagbe for Android",
+    "WHAT YOU GET ON THE APP",
+    "WHAT'S NEW"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Download APK"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/refer",
+   "title": "Refer & Earn",
+   "label": "Refer & Earn",
+   "group": "",
+   "section": "Settings",
+   "headings": [
+    "Refer & Earn",
+    "Nothing here yet"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Copy",
+    "WhatsApp",
+    "Export page"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/fraud?tab=queue",
+   "title": "Fraud Detection",
+   "label": "Fraud Detection › Queue",
+   "group": "",
+   "headings": [
+    "Fraud Detection",
+    "MD. RIfatul Islam Anik Rifat"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Verifications",
+    "Settings"
+   ],
+   "buttons": [
+    "Hold rules",
+    "Approve & confirm order",
+    "Call customer",
+    "Confirmed",
+    "No answer",
+    "Declined",
+    "Cancel order"
+   ],
+   "fields": [
+    "Trust this number, skip checks on future orders"
+   ],
+   "columns": [
+    "ORDER",
+    "COD",
+    "RISK",
+    "COURIER HISTORY",
+    "HELD BECAUSE"
+   ],
+   "filters": [],
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 1
+  },
+  {
+   "path": "/dashboard/orders/bulk",
+   "title": "Bulk create orders",
+   "label": "Bulk create orders",
+   "group": "Sales",
+   "section": "Sell",
+   "breadcrumb": "Orders › Bulk create",
+   "headings": [
+    "Bulk create orders"
+   ],
+   "tabs": [
+    "New orders",
+    "Old orders"
+   ],
+   "buttons": [
+    "Add row",
+    "Excel / CSV / JSON",
+    "View/Edit as JSON",
+    "Import Guideline",
+    "Clear all rows",
+    "Remove row",
+    "Delivery",
+    "Clear selection",
+    "Country code",
+    "Select district…",
+    "Select a district first",
+    "Search products…",
+    "Add another product",
+    "Select…",
+    "Create 0 orders"
+   ],
+   "fields": [
+    "Phone number",
+    "Product",
+    "Order type",
+    "Customer name",
+    "Customer phone",
+    "Delivery address",
+    "District / Upazila",
+    "Quantity",
+    "Unit price override",
+    "Additional products",
+    "Discount",
+    "Delivery charge",
+    "Note",
+    "Status",
+    "Channel"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/media",
+   "title": "Photo library",
+   "label": "Photo library",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Photo library"
+   ],
+   "tabs": [],
+   "sections": [
+    "Products",
+    "Pre-orders",
+    "Sizes & colours",
+    "Media",
+    "Reviews"
+   ],
+   "buttons": [
+    "Upload media",
+    "SEO images",
+    "Product gallery",
+    "inbox_voice",
+    "Payment proofs",
+    "Products",
+    "Variants",
+    "Storefront sections",
+    "Hero banners",
+    "Campaign gallery",
+    "Campaign covers",
+    "Campaign reviews",
+    "Category images",
+    "Logos",
+    "Store logo",
+    "Backgrounds",
+    "Invoice logo"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/products/new",
+   "title": "Add New Product",
+   "label": "Add New Product",
+   "group": "Products",
+   "section": "Stock",
+   "headings": [
+    "Add New Product",
+    "Wholesale Pricing"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Fill fields with AI",
+    "Save & add another",
+    "Save Product",
+    "Product Type",
+    "Collapse Product Type",
+    "Simple",
+    "Variable",
+    "Basic Info",
+    "Collapse Basic Info",
+    "Edit slug",
+    "Write with AI",
+    "Pricing",
+    "Collapse Pricing",
+    "Stock",
+    "Collapse Stock",
+    "Additional data",
+    "Add specification",
+    "Add question"
+   ],
+   "fields": [
+    "Ex: Samsung Galaxy A54",
+    "One line customers see in the product list…",
+    "Low Stock Threshold",
+    "583 · generated on save",
+    "UPC / EAN barcode",
+    "Meta Title",
+    "Meta Description",
+    "Product Name *",
+    "Category",
+    "Short Description",
+    "Full Description",
+    "Labels",
+    "Selling Price *",
+    "Discount Price",
+    "Cost Price",
+    "Base Wholesale Price",
+    "Track Inventory",
+    "Track Expiry / Batches",
+    "Track Serial / IMEI",
+    "Allow Pre-order",
+    "Opening Stock",
+    "Brand",
+    "Tax Rate",
+    "Tax included in price",
+    "Default Supplier",
+    "Default Warehouse",
+    "SKU",
+    "Barcode",
+    "Weight (Kg)",
+    "Unit",
+    "Extra Shipping Fee",
+    "Social / SEO Image",
+    "Upload"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/products/bulk",
+   "title": "Bulk create products",
+   "label": "Bulk create products",
+   "group": "Products",
+   "section": "Stock",
+   "breadcrumb": "Products › Bulk create",
+   "headings": [
+    "Bulk create products"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Add row",
+    "Excel / CSV / JSON",
+    "View/Edit as JSON",
+    "Import Guideline",
+    "Clear all rows",
+    "Simple",
+    "Category",
+    "Brand",
+    "pcs",
+    "Remove row",
+    "Create 0 products"
+   ],
+   "fields": [
+    "Product Name *",
+    "SKU",
+    "Barcode",
+    "Initial Stock",
+    "Low Stock Threshold",
+    "Product Image",
+    "Upload",
+    "Gallery Images",
+    "Track Inventory",
+    "Track Expiry / Batches",
+    "Track Serial / IMEI",
+    "Allow Pre-order"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/customers/bulk",
+   "title": "Bulk create customers",
+   "label": "Bulk create customers",
+   "group": "Customers",
+   "section": "Sell",
+   "breadcrumb": "Customers › Bulk create",
+   "headings": [
+    "Bulk create customers"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Add row",
+    "Excel / CSV / JSON",
+    "View/Edit as JSON",
+    "Import Guideline",
+    "Clear all rows",
+    "Remove row",
+    "Country code",
+    "Select district…",
+    "Select a district first",
+    "Create 0 customers"
+   ],
+   "fields": [
+    "Phone number",
+    "Update customers already in my list (fill empty fields only)",
+    "First name",
+    "Last name",
+    "Email",
+    "Phone",
+    "Delivery address",
+    "District / Upazila",
+    "Customer since",
+    "Credit limit",
+    "Labels",
+    "Note"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/accounting/allocations",
+   "title": "Operational costs",
+   "label": "Operational costs",
+   "group": "Cashbook",
+   "section": "Money",
+   "headings": [
+    "Operational costs"
+   ],
+   "tabs": [
+    "All",
+    "Draft",
+    "Confirmed"
+   ],
+   "sections": [
+    "Overview",
+    "Accounts",
+    "Transactions",
+    "Income",
+    "Expenses",
+    "Operational costs",
+    "Payments",
+    "Categories",
+    "Money with courier",
+    "Dues book"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "TYPE",
+    "DATE",
+    "PERIOD",
+    "PRODUCTS",
+    "AMOUNT",
+    "STATUS"
+   ],
+   "filters": [
+    "Expense date"
+   ],
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/purchase-orders/new",
+   "title": "New purchase order",
+   "label": "New purchase order",
+   "group": "Buying stock",
+   "section": "Stock",
+   "breadcrumb": "Purchase Orders › New",
+   "headings": [
+    "New purchase order"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Select supplier…",
+    "Select warehouse…",
+    "Add line",
+    "Select product…",
+    "Remove product",
+    "Select method…",
+    "Remove payment line",
+    "Split payment",
+    "Additional data",
+    "Cancel",
+    "Create purchase order"
+   ],
+   "fields": [
+    "Supplier",
+    "Warehouse",
+    "Order date",
+    "Expected date",
+    "Product",
+    "Qty",
+    "Unit cost",
+    "Expiry date",
+    "Discount",
+    "Tax",
+    "Shipping",
+    "Amount",
+    "Reference",
+    "Notes",
+    "Method",
+    "Auto-approve",
+    "Auto-receive"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/orders/campaign-links/new",
+   "title": "New campaign",
+   "label": "New campaign",
+   "group": "Campaigns",
+   "section": "Sell",
+   "breadcrumb": "Orders › Campaign links › New",
+   "headings": [
+    "New campaign"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Presets",
+    "Copy from previous",
+    "Add",
+    "Choose variant",
+    "Next: Page",
+    "Cancel",
+    "Create campaign"
+   ],
+   "fields": [
+    "Campaign name *",
+    "Add products",
+    "Coupon",
+    "Let customers change quantity"
+   ],
+   "columns": [],
+   "filters": [],
+   "search": "Search products by name, SKU or barcode…",
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/inbox/settings/bot",
+   "title": "AI bot",
+   "label": "AI bot",
+   "group": "Social media",
+   "section": "Sell",
+   "breadcrumb": "Inbox › AI bot",
+   "headings": [
+    "AI bot",
+    "Overview"
+   ],
+   "tabs": [],
+   "sections": [
+    "Social overview",
+    "Inbox",
+    "AI bot",
+    "Analytics",
+    "Bot health",
+    "Channels"
+   ],
+   "buttons": [
+    "Save",
+    "Use a template",
+    "Write with AI",
+    "Behaviour",
+    "Style",
+    "Knowledge",
+    "Selling",
+    "Tools and rules",
+    "Pick chats"
+   ],
+   "fields": [
+    "Test chats",
+    "Bot is on",
+    "Start on new chats",
+    "Channels",
+    "Messenger",
+    "Instagram",
+    "WhatsApp",
+    "Test mode"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/inbox/analytics",
+   "title": "AI bot analytics",
+   "label": "AI bot analytics",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "AI bot analytics",
+    "Money",
+    "Performance",
+    "Day by day",
+    "Add-on suggestions",
+    "Where the AI cost went",
+    "Why chats went to your team",
+    "Orders handled by AI bot",
+    "By channel",
+    "Most expensive chats"
+   ],
+   "tabs": [
+    "7 days",
+    "30 days",
+    "90 days",
+    "Custom"
+   ],
+   "sections": [
+    "Social overview",
+    "Inbox",
+    "AI bot",
+    "Analytics",
+    "Bot health",
+    "Channels"
+   ],
+   "buttons": [
+    "AI bot",
+    "Filters",
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "ORDER",
+    "CUSTOMER",
+    "CHANNEL",
+    "STATUS",
+    "TOTAL",
+    "WALLET COST",
+    "DATE"
+   ],
+   "filters": [],
+   "search": "Order, Customer...",
+   "list": true,
+   "pager": false,
+   "kind": "report",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/inbox/health",
+   "title": "Bot health",
+   "label": "Bot health",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Bot health",
+    "Top fixes",
+    "This week vs last week",
+    "Score by area",
+    "Questions the bot could not answer",
+    "Optimizer: test a change"
+   ],
+   "tabs": [],
+   "sections": [
+    "Social overview",
+    "Inbox",
+    "AI bot",
+    "Analytics",
+    "Bot health",
+    "Channels"
+   ],
+   "buttons": [
+    "AI bot",
+    "Fix it",
+    "Knowledge",
+    "Catalog readiness",
+    "Sales flow",
+    "Trust & safety",
+    "Conversion",
+    "Self-handled",
+    "Speed & reliability",
+    "Cost efficiency",
+    "Check recent chats now",
+    "New test"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/inbox/comments/results",
+   "title": "Comment results",
+   "label": "Comment results",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Comment results",
+    "No comments in this period"
+   ],
+   "tabs": [
+    "7 days",
+    "30 days",
+    "90 days",
+    "Custom"
+   ],
+   "sections": [
+    "Feeds",
+    "Posts",
+    "Comment automations",
+    "Comment AI",
+    "Comment results"
+   ],
+   "buttons": [],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/inbox/posts",
+   "title": "Posts",
+   "label": "Posts",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Posts",
+    "No posts yet"
+   ],
+   "tabs": [
+    "intelicasoft",
+    "omnichanel page"
+   ],
+   "sections": [
+    "Feeds",
+    "Posts",
+    "Comment automations",
+    "Comment AI",
+    "Comment results"
+   ],
+   "buttons": [
+    "Sort",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search posts",
+   "list": true,
+   "pager": false,
+   "kind": "list",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/inbox/settings/automations",
+   "title": "Comment automations",
+   "label": "Comment automations",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Comment automations",
+    "No rule yet"
+   ],
+   "tabs": [],
+   "sections": [
+    "Feeds",
+    "Posts",
+    "Comment automations",
+    "Comment AI",
+    "Comment results"
+   ],
+   "buttons": [
+    "New rule",
+    "Sort",
+    "Filter",
+    "Export",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "search": "Search rules or keywords",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": false,
+   "kind": "settings",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/inbox/comments/ai",
+   "title": "Comment AI",
+   "label": "Comment AI",
+   "group": "Social media",
+   "section": "Sell",
+   "headings": [
+    "Comment AI",
+    "Thanks, praise and greetings"
+   ],
+   "tabs": [],
+   "sections": [
+    "Feeds",
+    "Posts",
+    "Comment automations",
+    "Comment AI",
+    "Comment results"
+   ],
+   "buttons": [
+    "Off",
+    "Flag for me",
+    "Hide automatically",
+    "I approve",
+    "Send automatically",
+    "Remove",
+    "Add a reply",
+    "Use the built-in replies",
+    "Save replies",
+    "AI drafts, I send"
+   ],
+   "fields": [
+    "Write a short reply",
+    "Reply automatically",
+    "Like them on Facebook"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/fraud/verifications",
+   "title": "Verifications",
+   "label": "Verifications",
+   "group": "",
+   "section": "Sell",
+   "headings": [
+    "Verifications"
+   ],
+   "tabs": [
+    "All",
+    "Accepted",
+    "OTP required",
+    "OTP verified",
+    "OTP failed",
+    "Held · no SMS",
+    "Held by your rule",
+    "Scored only"
+   ],
+   "sections": [
+    "Overview",
+    "Verifications",
+    "Settings"
+   ],
+   "buttons": [
+    "Filter",
+    "Export page",
+    "Rows"
+   ],
+   "fields": [],
+   "columns": [
+    "SL",
+    "PHONE",
+    "SCORE",
+    "WHEN",
+    "DECISION",
+    "ORDER TOTAL",
+    "ORDER"
+   ],
+   "filters": [],
+   "search": "Search by phone…",
+   "filterButton": "Filter",
+   "list": true,
+   "pager": true,
+   "kind": "list",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/fraud?tab=settings",
+   "title": "Fraud Detection",
+   "label": "Fraud Detection › Settings",
+   "group": "",
+   "section": "Sell",
+   "headings": [
+    "Fraud Detection"
+   ],
+   "tabs": [],
+   "sections": [
+    "Overview",
+    "Verifications",
+    "Settings"
+   ],
+   "buttons": [
+    "Hold rules",
+    "Save changes"
+   ],
+   "fields": [
+    "Minimum order value",
+    "Resend cooldown (seconds)",
+    "Trusted score"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/products/preorders/settings",
+   "title": "Pre-order settings",
+   "label": "Pre-order settings",
+   "group": "Products",
+   "section": "Stock",
+   "breadcrumb": "Products › Pre-orders › Settings",
+   "headings": [
+    "Pre-order settings"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Save changes"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "settings",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/addons?tab=gateways",
+   "title": "Addons",
+   "label": "Addons › Gateways",
+   "group": "Settings",
+   "section": "Settings",
+   "headings": [
+    "Addons"
+   ],
+   "tabs": [
+    "All",
+    "Payment gateways",
+    "Couriers",
+    "Notifications",
+    "Essentials"
+   ],
+   "buttons": [
+    "How to get credentials?",
+    "Install"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/billing",
+   "title": "Billing & wallet",
+   "label": "Billing & wallet",
+   "group": "Notifications",
+   "section": "Settings",
+   "headings": [
+    "Billing & wallet",
+    "VIP plan"
+   ],
+   "tabs": [
+    "Plans",
+    "Wallet usage",
+    "Payments",
+    "Monthly",
+    "Other"
+   ],
+   "buttons": [
+    "Change plan",
+    "Renew",
+    "Add funds",
+    "Set limit"
+   ],
+   "fields": [],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "other",
+   "depth": 2
+  },
+  {
+   "path": "/dashboard/roles/create",
+   "title": "New role",
+   "label": "New role",
+   "group": "Employees",
+   "section": "Settings",
+   "breadcrumb": "Roles & permissions › New role",
+   "headings": [
+    "New role",
+    "No modules selected"
+   ],
+   "tabs": [],
+   "buttons": [
+    "Create role",
+    "Cancel",
+    "Select modules…"
+   ],
+   "fields": [
+    "Role name",
+    "Modules"
+   ],
+   "columns": [],
+   "filters": [],
+   "list": false,
+   "kind": "form",
+   "depth": 2
+  }
+ ]
+}

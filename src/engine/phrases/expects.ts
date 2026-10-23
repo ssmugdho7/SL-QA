@@ -1,8 +1,12 @@
 import fs from 'fs';
 import { parse } from 'csv-parse/sync';
 import type { CaseContext, Shot } from '../context.js';
-import type { Card, Snap } from '../ui.js';
-import { lc, list, listItems, money, orderBreak, quoted, words } from './text.js';
+import { pagePath } from '../pages.js';
+import { escapeRe as esc, type Card, type Snap } from '../ui.js';
+import { readValue } from './actions.js';
+import { nearest } from './fallback.js';
+import { messages } from './natural.js';
+import { isLabel, lc, list, listItems, money, orderBreak, quoted, uiNames, when, words } from './text.js';
 
 /**
  * Expectation rules: one claim from the Expected Result column → one or more checks.
@@ -48,6 +52,29 @@ function hasBom(file: string): boolean {
 /** Visible text check that tolerates page chrome: the text is a whole heading/button/label on the page. */
 function shown(snap: Snap, text: string): boolean {
   return new RegExp(`(^|[\\s|>(])${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[\\s|<).,:])`, 'i').test(snap.text);
+}
+
+const ROWS = 'tbody tr, [role=row]:not(:has([role=columnheader])), article, [role=listitem]';
+const has = (text: string, want: string) => lc(text).includes(lc(want)) || words(text).includes(words(want));
+const bodyText = async (t: CaseContext) => (await t.page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ') + ' ' + t.toasts.join(' ');
+
+/**
+ * Names a claim says should be on screen: "Total Sales, Total Orders and Total Customers cards", "The page title
+ * 'Money with Courier'", "the 'Export' button". Only quoted text or Title Case labels count; a description
+ * ("the new store name", "Delivery success ratio") is not something to look for word for word → null.
+ */
+function shownNames(subject: string): string[] | null {
+  const noun = /\s(?:cards?|buttons?|tabs?|links?|columns?|fields?|labels?|options?|sections?|headings?|icons?|menu items?|tiles?|widgets?|charts?|titles?)$/i.test(subject.trim());
+  const s = subject.trim()
+    .replace(/^(?:the |a |an |all |both )?(?:page |main |new )?(?:title|heading|header|text|label|button|tab|link|column|field|option|card|section|menu item|message)s?\s+(?=['"‘“])/i, '')
+    .replace(/\s+(?:cards?|buttons?|tabs?|links?|columns?|fields?|labels?|options?|sections?|headings?|icons?|menu items?|tiles?|widgets?|charts?|titles?|texts?)$/i, '');
+  const names = uiNames(s);
+  if (!names?.length) return null;
+  if (quoted(s).length) return names;
+  // Unquoted: the first word of a sentence is capitalised anyway, so the first name needs a second capital ("Total Sales", "SKU").
+  const caps = (n: string) => n.split(/\s+/).filter((w) => /^[\p{Lu}\d]/u.test(w)).length;
+  // "Export button": one capitalised word is a name when the sentence says what kind of control it is.
+  return (caps(names[0]) >= 2 || /^\p{Lu}{2,}$/u.test(names[0]) || (noun && names.length === 1 && !/^(?:the|a|an|all|this|that|each|every|new)$/i.test(names[0]))) && names.every((n) => isLabel(n)) ? names : null;
 }
 
 async function fixtureNow(t: CaseContext, i = 0) {
@@ -255,9 +282,11 @@ export const EXPECT_RULES: ExpectRule[] = [
   },
   {
     name: 'card increases/decreases',
-    pattern: /^(.+?) should (increase|decrease) by (\d+)$/i,
+    // Only the summary cards and status tabs it can read before and after; other amounts ("Balance", "On Hand") are left
+    // to the AI, which notes the value before the steps (REMEMBER) and compares after them.
+    pattern: /^((?:the )?(?:total products|in stock|low stock|out of stock|active|inactive|draft|archived|all)(?: (?:card|tab|tab count|count))?|(?:the )?[\w ]+? (?:card|tab count|tab))(?: count)? should (increase|decrease) by (\d+)$/i,
     check: async (t, m) => {
-      const label = m[1].replace(/^the /i, '').replace(/ (tab )?count$/i, '').trim();
+      const label = m[1].replace(/^the /i, '').replace(/ (tab )?count$| card$| tab$/i, '').trim();
       const before = first(t);
       const after = last(t);
       const fromTab = (s?: Snap) => s?.tabs[label[0].toUpperCase() + label.slice(1)]?.count ?? null;
@@ -1025,6 +1054,216 @@ export const EXPECT_RULES: ExpectRule[] = [
       const bad = rows.filter((r) => (priceKey && !/^-?[\d.]+$/.test(r[priceKey].trim())) || (stockKey && !/^-?[\d.]+$/.test(r[stockKey].trim())));
       t.check('Prices and stock are numbers', !!priceKey && !!stockKey && !bad.length, bad.length ? `e.g. "${bad[0][priceKey!]}", "${bad[0][stockKey!]}"` : `columns '${priceKey}', '${stockKey}'`,
         "Export the raw numbers ('1400', '16'), not display text ('৳1,400.00', '16 pcs').");
+    },
+  },
+
+  // ── Generic claims (any page; after the specific rules above) ───────────
+  {
+    name: 'message with text',
+    // 'Validation error "Product name is required" should be displayed', 'A warning "Out of stock" should be shown'.
+    pattern: when(/^(?:an? |the )?(?:(success|error|validation(?: error)?|warning|confirmation|info)\s+)?(?:message|toast|notification|alert|error|warning|text)?\s*(?:saying|that says|with (?:the )?text|reading|like|:)?\s*['"‘“](.+?)['"’”]\s*(?:message|toast|notification|alert|error|warning|text)?\s*(?:should|must) (?:be )?(?:appear|shown|displayed|show(?: up)?|visible|pop up)(?: (?:under|below|next to|near|beside|on|in|above) (?:the |each )?[\w ]+)?$/i, (m) => /\b(?:success|error|validation|warning|confirmation|info|message|toast|notification|alert|text)\b/i.test(m[0])),
+    check: async (t, m) => {
+      const want = m[2];
+      const seen = [...t.toasts, ...(await messages(t))];
+      const page = await bodyText(t);
+      const hit = seen.find((s) => has(s, want)) ?? (has(page, want) ? 'on the page' : '');
+      t.check(`A message '${want}' is shown`, !!hit, hit ? (hit === 'on the page' ? 'shown on the page' : hit.slice(0, 160)) : `not shown${seen.length ? `; messages seen: ${[...new Set(seen)].join(' | ').slice(0, 160)}` : '; no message appeared'}`,
+        'The message is missing or worded differently; compare with the screenshot.');
+    },
+  },
+  {
+    name: 'confirmation dialog appears',
+    pattern: /^(?:an? |the )?confirm(?:ation)?(?: (?:popup|pop-up|dialog|modal|box|prompt|window|message))+ (?:should|must) (?:appear|be shown|be displayed|open|pop up|show(?: up)?)(?: before .+)?$/i,
+    check: async (t) => {
+      const text = (t.noted.get('__confirmText') as string | undefined) ?? t.snaps.map((s) => s.snap.dialog).find(Boolean) ?? (await t.ui.dialogText());
+      t.check('A confirmation dialog appears', !!text, text ? `"${text.slice(0, 140)}"` : 'no dialog appeared in any step', 'The action runs without asking first.');
+    },
+  },
+  {
+    name: 'success message (generic)',
+    pattern: /^(?:an? |the )?success(?:ful)? (?:message|toast|notification|alert|popup|pop-up)(?: message)? (?:should|must) (?:appear|be shown|be displayed|show(?: up)?|pop up|be visible)$/i,
+    check: async (t) => {
+      const seen = [...t.toasts, ...t.snaps.map((s) => s.snap.toast)].filter(Boolean);
+      const ok = seen.find((s) => /success|saved|created|added|updated|done|deleted|removed|sent|published|connected|collected|recorded/i.test(s) && !/fail|error|invalid|could not|can't|cannot/i.test(s));
+      t.check('A success message appears', !!ok, ok ?? (seen.length ? `only: ${[...new Set(seen)].join(' | ').slice(0, 160)}` : 'no message appeared'), 'Saving did not confirm success (or failed); see the screenshot.');
+    },
+  },
+  {
+    name: 'removed from list',
+    // "After confirming, selected products should be removed from the list", "The test category should not be listed".
+    pattern: /^(?:after (?:confirming|deleting|saving)[^,]*,\s*)?(?:the |all )?(selected|ticked|deleted|test) (?:\w+ )?(?:products|items|records|rows|entries|orders|customers|categories|brands|\w+s?) (?:should (?:be )?(?:removed|deleted|gone|disappear|no longer (?:be )?(?:shown|listed|visible))|should not (?:be )?(?:shown|listed|visible|appear))(?: (?:from|in) the list)?$/i,
+    check: async (t, m, claim) => {
+      const names = t.selection.length ? t.selection : [t.noted.get('__row') as string].filter(Boolean);
+      if (!names.length) return t.skip(claim, 'No records were selected or acted on in the steps, so there is nothing to look for.');
+      await t.ui.settle();
+      const page = await bodyText(t);
+      const left = names.filter((n) => has(page, n));
+      t.check(`${names.length > 1 ? `The ${names.length} ${m[1]} records are` : `'${names[0]}' is`} gone from the list`, !left.length, left.length ? `still listed: ${list(left)}` : 'not on the page', 'The delete did not happen, or the list was not refreshed.');
+    },
+  },
+  {
+    name: 'entry shown in list',
+    // "The new category should appear in the category list", "The entry should be shown in the list", "The staff should be listed with status Pending".
+    pattern: /^(?:the )?(?:new |created |added |same |saved )?(entry|record|item|row|category|customer|brand|label|coupon|staff(?: member)?|user|product|page|post|supplier|expense|transaction|campaign|role|warehouse)(?: should (?:be )?(?:added|created|saved)(?: successfully)?)?(?:,? and)? (?:should )?(?:be )?(?:appear|shown|listed|displayed|visible|show up)(?: (?:at the (top|bottom) of|in|on) (?:the )?(?:[\w ]+ )?(?:list|table|page))?(?: with (?:the )?(?:status )?['"‘“]?([\w ]+?)['"’”]?)?$/i,
+    check: async (t, m, claim) => {
+      const typed = ((t.noted.get('__entered') as { label: string; value: string }[] | undefined) ?? []).filter((x) => x.value.trim());
+      const name = [...typed].reverse().find((x) => /name|title|code|note|description|phone/i.test(x.label) || !/^\d[\d.,]*$/.test(x.value))?.value ?? typed.at(-1)?.value;
+      if (!name) return t.skip(claim, 'No value was typed in the steps, so there is nothing to look for in the list.');
+      await t.ui.settle();
+      const rows = t.ui.main.locator(ROWS).filter({ hasText: name }).filter({ visible: true });
+      const n = await rows.count().catch(() => 0);
+      const row = n ? (await rows.first().innerText().catch(() => '')).replace(/\s+/g, ' ') : '';
+      const found = n > 0 || has(await bodyText(t), name);
+      t.check(`'${name}' is listed`, found, n ? row.slice(0, 140) : found ? 'on the page (not in a list row)' : `not on the page (${new URL(t.page.url()).pathname})`, 'The save failed, or the list is not refreshed after it.');
+      if (found && m[3]) t.check(`'${name}' shows '${m[3]}'`, has(row || (await bodyText(t)), m[3]), row.slice(0, 140) || 'no row');
+      if (found && m[2] && n) {
+        const first = (await t.ui.main.locator(ROWS).filter({ visible: true }).first().innerText().catch(() => '')).replace(/\s+/g, ' ');
+        const at = m[2].toLowerCase() === 'top' ? has(first, name) : has((await t.ui.main.locator(ROWS).filter({ visible: true }).last().innerText().catch(() => '')), name);
+        t.check(`'${name}' is at the ${m[2]} of the list`, at, at ? 'yes' : `the ${m[2]} row is: ${first.slice(0, 100)}`);
+      }
+    },
+  },
+  {
+    name: 'shown in list',
+    // "'Test Shirt' should be shown in the product list", "'About Us' should be shown in the list".
+    pattern: /^['"‘“](.+?)['"’”] should (?:be )?(?:shown|listed|displayed|visible|appear)(?: in| on) (?:the )?(?:[\w ]+ )?(?:list|table|results)$/i,
+    check: async (t, m) => {
+      await t.ui.settle();
+      const rows = t.ui.main.locator(ROWS).filter({ hasText: m[1] }).filter({ visible: true });
+      const n = await rows.count().catch(() => 0);
+      const found = n > 0 || has(await bodyText(t), m[1]);
+      t.check(`'${m[1]}' is listed`, found, n ? (await rows.first().innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 140) : found ? 'on the page' : `not on the page (${new URL(t.page.url()).pathname})`);
+    },
+  },
+  {
+    name: 'stays after refresh',
+    // "Order status should remain Delivered after refresh".
+    pattern: when(/^(?:the )?(?:(.+?) )?(?:should|must) (?:remain|stay|still be|still show|be|show) ['"‘“]?(.+?)['"’”]? after (?:a |the )?(?:page )?(?:refresh|reload)(?:ing)?(?: the page)?$/i, (m) => isLabel(m[2].replace(/^['"‘“]|['"’”]$/g, '')) || /^[\d.,৳]+$/.test(m[2])),
+    check: async (t, m) => {
+      const label = (m[1] ?? '').replace(/^(?:the|order|product|its)\s+/i, '').trim();
+      const reloaded = shotAfter(t, /refresh|reload/i).length > 0;
+      const read = label ? await readValue(t, label).catch(() => null) : null;
+      const page = await bodyText(t);
+      const ok = read ? has(read, m[2]) : has(page, m[2]);
+      t.check(`${label || 'The page'} shows '${m[2]}'${reloaded ? ' after the reload' : ''}`, ok, read ? `'${label}' shows ${read}` : ok ? `'${m[2]}' is on the page` : `'${m[2]}' is not on the page`, 'The change was shown but not saved.');
+      if (!reloaded) t.note(`"${m[0]}": no reload step ran, so this was read on the page as it was.`);
+    },
+  },
+  {
+    name: 'redirected to page',
+    pattern: when(/^(?:the user |user |it |you |i )?(?:should|must) (?:be )?(?:redirected|taken|navigated|sent|brought|moved|go(?:ne)?) (?:back )?to (?:the )?(.+?)(?: page| screen)?$/i, (m) => !!pagePath(m[1])),
+    check: async (t, m) => {
+      const want = pagePath(m[1])!;
+      const at = new URL(t.page.url());
+      const ok = at.pathname === want.split('?')[0];
+      t.check(`The page is ${m[1]} (${want})`, ok, `the page is ${at.pathname}${at.search}`, 'The action did not navigate where expected.');
+    },
+  },
+  {
+    name: 'opens page or dialog',
+    // "Should open the Add Category dialog", "Clicking it should open the Orders page".
+    pattern: when(/^(?:(?:it|this|that|clicking (?:it|this)|the (?:button|link)) )?(?:should|must) open (?:the |a |an )?(.+?) (page|screen|dialog|modal|drawer|popup|pop-up|form|panel)$/i, (m) => (/page|screen/i.test(m[2]) ? !!pagePath(m[1]) : isLabel(m[1]) || /^(?:new|edit|add|create)\b/i.test(m[1]))),
+    check: async (t, m) => {
+      if (/page|screen/i.test(m[2])) {
+        const want = pagePath(m[1])!;
+        const at = new URL(t.page.url()).pathname;
+        return void t.check(`The ${m[1]} page opens`, at === want.split('?')[0], `the page is ${at}`);
+      }
+      const text = (await t.ui.dialogText()) || (t.snaps.map((s) => s.snap.dialog).filter(Boolean).at(-1) ?? '');
+      const ok = !!text && (words(text).includes(words(m[1])) || words(m[1]).split(' ').some((w) => w.length > 3 && words(text).includes(w)));
+      t.check(`The ${m[1]} ${m[2]} opens`, ok, text ? `a dialog shows: "${text.slice(0, 120)}"` : 'no dialog is open');
+    },
+  },
+  {
+    name: 'control enabled/disabled',
+    // "The Save button should be disabled", "'Place Order' should stay enabled".
+    pattern: when(/^(?:the )?(.+?)(?: (?:button|link|toggle|switch|field|option|control))? (?:should|must) (?:be |stay |remain |become |appear )?(disabled|enabled|greyed out|grayed out|inactive|not clickable|clickable)$/i, (m) => isLabel(m[1].replace(/^['"‘“]|['"’”]$/g, ''))),
+    check: async (t, m) => {
+      const name = m[1].replace(/^['"‘“]|['"’”]$/g, '');
+      const want = /^(?:enabled|clickable)$/i.test(m[2]) ? 'enabled' : 'disabled';
+      const el = t.page.getByRole('button', { name: new RegExp(`^\\s*${esc(name)}(?![\\p{L}\\p{N}])`, 'iu') }).or(t.page.getByRole('link', { name: new RegExp(`^\\s*${esc(name)}`, 'i') })).or(t.page.getByLabel(new RegExp(`^\\s*${esc(name)}\\s*\\*?$`, 'i'))).filter({ visible: true }).first();
+      if (!(await el.count().catch(() => 0))) return void t.check(`'${name}' is ${want}`, false, 'not on the page');
+      const disabled = (await el.isDisabled().catch(() => false)) || (await el.getAttribute('aria-disabled').catch(() => null)) === 'true';
+      t.check(`'${name}' is ${want}`, want === 'disabled' ? disabled : !disabled, disabled ? 'disabled' : 'enabled');
+    },
+  },
+  {
+    name: 'only matching rows',
+    // "low stock products only", "The list should show only Pending orders", "Only Delivered orders should be displayed".
+    pattern: when(/^(?:(?:the )?list should (?:only )?show (?:only )?|only )?(?:the )?['"‘“]?([\w -]+?)['"’”]? (?:products|orders|customers|items|entries|records|rows|transactions|results)(?: only| should be (?:shown|displayed|listed|visible))?$/i, (m) => /^(?:only|the list)\b|\bonly$|should be/i.test(m[0]) && /^(?:low stock|out of stock|in stock|active|inactive|draft|archived|pending|processing|confirmed|completed|delivered|returned|cancelled|refunded|paid|unpaid|due|overdue|shipped|failed)$/i.test(m[1].trim())),
+    check: async (t, m) => {
+      const value = m[1].trim();
+      await t.ui.settle();
+      const rows = (await t.ui.main.locator('tbody tr').filter({ visible: true }).allInnerTexts().catch(() => [] as string[])).map((r) => r.replace(/\s+/g, ' ').trim()).filter(Boolean);
+      const stock = /stock/i.test(value);
+      // Stock level is computed by the app; ask it which products are low / out, rather than reading badges.
+      const allowed = stock ? (await t.api.allProducts(/low/i.test(value) ? 'stock=low' : /out/i.test(value) ? 'stock=out' : '').catch(() => [])).map((p) => p.name) : null;
+      const wrong = rows.filter((r) => (allowed ? !allowed.some((n) => r.includes(n)) : !has(r, value)));
+      const filtered = Object.keys(t.state.filters).length > 0 || !!t.state.tab;
+      t.check(`Only ${value} records are listed`, !wrong.length && (rows.length > 0 || filtered), rows.length ? (wrong.length ? `${wrong.length} of ${rows.length} rows are not ${value}, e.g. ${wrong.slice(0, 2).map((r) => `"${r.slice(0, 70)}"`).join(', ')}` : `all ${rows.length} rows are ${value}`) : 'the list is empty',
+        'The filter or tab is not applied to the list.');
+    },
+  },
+  {
+    name: 'searched record found',
+    // "product should come in result", "The searched customer should appear in the results".
+    pattern: /^(?:the )?(?:searched |same )?(?:product|order|customer|item|record|it)s? should (?:come|appear|be shown|be listed|show(?: up)?|be found) in (?:the )?(?:search )?results?$/i,
+    check: async (t, m, claim) => {
+      const term = t.state.search;
+      if (!term) return t.skip(claim, 'No search ran in the steps.');
+      const want = t.state.searchTarget?.name ?? t.state.searchTarget?.sku ?? term;
+      await t.ui.settle();
+      const rows = (await t.ui.main.locator(ROWS).filter({ visible: true }).allInnerTexts().catch(() => [] as string[])).map((r) => r.replace(/\s+/g, ' '));
+      const hit = rows.find((r) => has(r, want));
+      t.check(`Searching '${term}' finds '${want}'`, !!hit, hit ? hit.slice(0, 140) : `${rows.length} result(s), none with '${want}'`, 'Search does not cover this field, or the value is stored differently.');
+    },
+  },
+  {
+    name: 'list filtered',
+    // "Products should be filtered", "The list should update accordingly" (after a filter, tab or search step).
+    pattern: /^(?:the )?(?:list|products|orders|customers|results|items|entries|records|table)(?: list)? should (?:be filtered|get filtered|update|change|be updated)(?: (?:accordingly|correctly|as expected))?$/i,
+    check: async (t, m, claim) => {
+      const narrowed = t.snaps.filter((x) => Object.keys(x.state.filters).length || x.state.tab || x.state.search).at(-1);
+      if (!narrowed) return t.skip(claim, 'No filter, tab or search was applied in the steps.');
+      const before = first(t)?.showing;
+      const after = narrowed.snap.showing;
+      if (!before || !after) return t.skip(claim, 'The list shows no "Showing x–y of z" count to compare.');
+      const what = [...Object.entries(narrowed.state.filters).map(([k, v]) => `${k} = '${v}'`), narrowed.state.tab && `tab '${narrowed.state.tab}'`, narrowed.state.search && `search '${narrowed.state.search}'`].filter(Boolean).join(', ');
+      t.check(`The list changes after ${what}`, after.total !== before.total || after.text !== before.text, `${before.text} → ${after.text}`, 'The filter is not applied to the list.');
+    },
+  },
+  {
+    name: 'value shows',
+    // "Order status should change to Shipped", "The status should be Pending", "Invoice size should show A5".
+    pattern: when(/^(?:the )?([\w ]{2,30}?) (?:should|must) (?:change to|become|be updated to|be changed to|show|read|display|be set to|be) ['"‘“]?(.+?)['"’”]?$/i, (m) => m[1].trim().split(/\s+/).length <= 3 && !/^(?:it|this|that|they|page|list|user|system|there|product|order|customer)$/i.test(m[1].trim()) && (isLabel(m[2]) || /^[৳\d][\d.,%]*$/.test(m[2])) && !/^(?:shown|displayed|visible|hidden|disabled|enabled|removed|deleted|saved|added|created|updated|listed|blocked|correct|empty|blank|zero|0)$/i.test(m[2])),
+    check: async (t, m) => {
+      const label = m[1].trim().replace(/^(?:order|product|customer|its|their)\s+(?=\w)/i, '');
+      const read = await readValue(t, label).catch(() => null) ?? await readValue(t, m[1].trim()).catch(() => null);
+      const page = await bodyText(t);
+      const ok = read !== null ? has(read, m[2]) : has(page, m[2]);
+      t.check(`${m[1].trim()} shows '${m[2]}'`, ok, read !== null ? `'${label}' shows ${read}` : ok ? `'${m[2]}' is on the page (no '${label}' label found)` : `'${m[2]}' is not on the page`, 'The change was not applied or not saved.');
+    },
+  },
+  {
+    name: 'names shown',
+    // "Total Sales, Total Orders and Total Customers cards should be displayed", "The page title 'Money with Courier' should be shown".
+    pattern: when(/^(.+?) (?:should|must) (?:be )?(?:displayed|shown|visible|present|listed|appear|show up)(?: on (?:the )?(?:page|screen|dashboard|header|top))?$/i, (m) => !!shownNames(m[1])),
+    check: async (t, m) => {
+      const names = shownNames(m[1])!;
+      const page = await bodyText(t);
+      const missing = names.filter((n) => !has(page, n));
+      t.check(`${names.map((n) => `'${n}'`).join(', ')} ${names.length > 1 ? 'are' : 'is'} shown`, !missing.length, missing.length ? `not on the page: ${list(missing)}${nearest(page, missing[0])}` : 'all on the page',
+        'The text or control is missing, renamed or hidden on this page.');
+    },
+  },
+  {
+    name: 'names not shown',
+    pattern: when(/^(.+?) (?:should|must) (?:not|never) (?:be )?(?:displayed|shown|visible|present|listed|appear)(?: (?:on|in) (?:the )?(?:page|screen|list|dashboard|header))?$|^(.+?) (?:should|must) (?:be )?(?:hidden|disappear)$/i, (m) => !!shownNames(m[1] ?? m[2])),
+    check: async (t, m) => {
+      const names = shownNames(m[1] ?? m[2])!;
+      const page = await bodyText(t);
+      const there = names.filter((n) => has(page, n));
+      t.check(`${names.map((n) => `'${n}'`).join(', ')} ${names.length > 1 ? 'are' : 'is'} not shown`, !there.length, there.length ? `on the page: ${list(there)}` : 'not on the page');
     },
   },
 

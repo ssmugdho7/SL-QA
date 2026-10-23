@@ -63,7 +63,8 @@ This is **browser automation for end-to-end testing, plus direct REST API calls*
   - `Ui.snapshot()` (`src/engine/ui.ts:103-205`) runs after every step and collects cards, tabs, table rows, pager text, dialogs, toasts and so on.
   - `inspectPage` (`src/engine/inspect.ts`) records page health before the steps.
 - A thin **REST client** (`src/engine/apps/slshop/api.ts`) calls the slshop backend to create test data, verify values and clean up afterwards.
-- **No HTTP page scrapers or crawlers.** The only other `fetch` calls are:
+- **A read-only crawler** (`src/engine/apps/slshop/crawl.ts`, §6.6) walks the logged-in dashboard in the same Playwright browser to build a site map of UI labels (no store data). It is not an HTTP scraper.
+- **No HTTP page scrapers.** The only other `fetch` calls are:
   - the Google Sheet CSV export (`src/engine/sources/google-sheet.ts`)
   - the AI providers (`src/engine/ai/providers.ts`)
   - the token check (`GET /auth/me`, `session.ts:~79`)
@@ -160,12 +161,14 @@ flowchart LR
 | `src/engine/context.ts` | `CaseContext`: pages, checks, notes, screenshots, fixtures, cleanup, `verdictFrom` |
 | `src/engine/inspect.ts` | Page health inspection before steps |
 | `src/engine/ui.ts` | Dashboard driver (buttons, groups, dialogs, bulk bar) and `snapshot()` |
-| `src/engine/pages.ts` | `PAGES` map: 39 page names and synonyms pointing at about 30 dashboard paths |
+| `src/engine/pages.ts` | `PAGES` map (39 hand-written names) merged with every page in the site map: about 800 names for about 140 paths. `pagePath`, `pageInfo`, `knownPage`, `knownPages`, `PAGE_NAMES` |
 | `src/engine/report.ts` | Writes `report.md` |
 | `src/engine/sources/` | `cases.ts` (TestCase model, column aliases, `rowUrl`), `google-sheet.ts`, `upload.ts`, `bug-text.ts` |
 | `src/engine/phrases/` | The phrase engine (see §6) |
 | `src/engine/apps/slshop/api.ts` | REST client for the slshop backend |
 | `src/engine/apps/slshop/product-form.ts` | Dedicated driver for the Add/Edit Product form |
+| `src/engine/apps/slshop/crawl.ts` | Read-only site crawler (`discoverPages`), site map I/O, and `siteCases` (one read-only QA case per page) |
+| `src/engine/apps/slshop/site-map.json` | The generated site map (committed). UI labels only |
 | `src/engine/fixtures/images.ts` | Locally generated upload files (PNG/JPEG/WEBP/GIF/PDF, fake `.exe`) |
 | `src/engine/ai/` | `providers.ts`, `translate.ts`, `assist.ts` (see §7) |
 | `data/` (git-ignored) | Suites, runs, uploads, `translations.json`, `ai-usage.json` |
@@ -368,7 +371,35 @@ Quoted values use **single quotes** only: the pattern is `'([^']*)'` (`actions.t
 - **Products list**: rich rules in `steps.ts` and `expects.ts`, using `Ui` and API checks.
 - **Add/Edit Product form**: `apps/slshop/product-form.ts`. Its inputs have no `<label for>`, so it uses an XPath label match then `following::input`, a `FIELD_ALIASES` map from sheet wording to labels, and opens collapsed sections. Saving watches POST/PUT/PATCH responses on `/catalog/products[/<id>]` and records status, new ID and server validation errors.
 - **POS**: add to cart, fill checkout with the fixed `TEST_CUSTOMER` (`natural.ts:16`), discount through the pencil editor, place a **real order** and read it back through the API.
-- **Every other page** uses the `pages.ts` map, the sidebar, the step language, plain click, and the fallback checks.
+- **Every other page** uses the `pages.ts` map (now including every crawled page), the sidebar, the step language, plain click, and the fallback checks.
+
+### 6.6 Site map, crawler and whole-dashboard QA (`apps/slshop/crawl.ts`)
+
+**Crawler** (`discoverPages(session, opts)`): one logged-in browser context, 3 tabs working a shared breadth-first queue.
+
+1. Opens `/dashboard`, expands every collapsed sidebar group (`aside nav button[aria-expanded=false]`, up to 5 rounds for nested groups such as Reports › Sales) and reads each link with its group chain and section heading ("Analyze", "Stock", "Money").
+2. Visits each page (depth 1), then the links found in its own content and its section menu (`nav[aria-label$="sections"]`) to depth 2. Limits: `maxPages` 200, `maxMs` 15 min (the dashboard has about 140 pages at depth 2: 120 in the sidebar, about 20 found inside them). A page found inside another takes the sidebar group of its closest parent path; `?tab=` pages add the tab to their label. Chart contents (`svg`, `canvas`) are skipped.
+3. `crawlPath` keeps only same-origin `/dashboard/...` links. It drops record pages (`?id=`, numeric or UUID segments), anything matching logout/delete/archive/cancel/refund/withdraw/recharge/checkout/reset/disconnect, and every query key except `slug`, `stage`, `tab` and `section` (which select a different page, e.g. `/dashboard/reports/view?slug=cash-flow`).
+4. Per page it reads `main` but skips the top bar, sidebar, `tbody`, `article`, dialogs, toasts, summary cards, menus and listboxes: h1 and headings, `role=tab` and the Status group tabs, the section menu, buttons, field labels/placeholders, table headers, the search box placeholder, the Filter button, list signals (rows, "Showing x–y of z", pager) and the breadcrumb. The only click is opening the Filter panel to read its section names, then `Escape`. JS dialogs are dismissed.
+5. **Redaction** (`redact`): counts are stripped ("Pending 20" → "Pending"); a label is dropped if it is longer than 60 characters, has no letters, or contains `@`, `৳`/`$`, a URL, a 4+ digit run or a phone-like `+`; and it is dropped if it contains a name of this store's owner, store, products, categories, brands, labels or customers (read through the API, never written anywhere).
+6. `kind` is a guess: `report` (reports, analytics, overviews, `/dashboard`), `settings`, `form`, `detail`, `list`, `other`. Pages that only redirect to one already recorded are skipped.
+
+The result is written to `src/engine/apps/slshop/site-map.json` (`{generatedAt, tookMs, pages: PageInfo[]}`) and is committed. A full crawl of about 140 pages takes about 5.5 minutes.
+
+**Page names** (`pages.ts`): at load, `PAGES` is merged with every crawled page by sidebar label, "Group › Label", "Group > Label", "Full › Group › Label", "Label under Group", "Label in Group", "Section › Label", breadcrumb and h1. `PAGES` wins on clashes, then sidebar names, then breadcrumbs and headings. `pagePath` accepts `›`, `»` and `>` separators. `PAGE_NAMES` (the alternation used by the "open page by name" rule) is built once at load from all names, longest first, every name regex-escaped; it is a flat alternation, so matching stays linear (2,000 non-matching sentences take under 10 ms). `reloadPages()` refreshes `pagePath`/`pageInfo` after a crawl; `PAGE_NAMES` picks up new names on restart. `pageInfo(pathOrUrl)` returns the crawled `PageInfo` (headings, tabs, buttons, fields, columns, filters) for prompts and pickers.
+
+**Site cases** (`siteCases(map, {limit, ids, kinds})`): one `TestCase` per page, `SITE-001`…, title "<label> page", scenario = sidebar group, url = path. Steps use only the step language and only safe controls:
+
+| Page has | Steps |
+|---|---|
+| an enabled "Next page" | `CLICK 'Next page'` |
+| tabs | `CLICK '<tab>'` for up to 4 (names that look like create/save/delete are skipped) |
+| a Filter button | `CLICK 'Filter'`, `PRESS 'Escape'` |
+| a search box | `WAIT 1` (after earlier steps, so the list finishes re-fetching), then `TYPE 'test' INTO '<placeholder>'` |
+
+Expected results: "The page should load without errors.", "The page should not show NaN or undefined values." (fallback checks), `EXPECT TEXT '<h1>'` and, with a search box, `EXPECT FIELD '<placeholder>' = 'test'`. Every generated case previews 100% understood. `--limit N` picks N pages spread evenly over the map, not the first N. Live AI help is switched off for these runs (`AI_LIVE=off` for the run's duration in `runner.ts` and the CLI), so a failed step is reported as it is instead of being "repaired" by clicking some other control.
+
+**Front ends.** CLI: `--crawl [--max N]`, `--site [--preview] [--limit N] [SITE-ID …]` (crawls first if there is no map). Web: the Suites page card "Check the whole dashboard" posts to `/site`. It starts a background crawl (`runner.ts startCrawl`, in memory, one at a time) when the map is missing, over 7 days old, or "Re-crawl" was pressed; otherwise it creates or refreshes the suite "Whole dashboard (auto)" (`source.kind = 'site'`, `syncSiteSuite`). Cases edited or added in that suite, and rows deleted there, are kept on refresh. The suite runs through the normal queue. The **Page link** field on Add case offers the crawled paths as a `<datalist>`.
 
 ---
 
@@ -489,6 +520,10 @@ npm install
 npx playwright install chromium   # first time only
 cp .env.example .env              # then fill in values locally
 
+# Crawl the dashboard (read-only) and check every page
+npx tsx src/cli.ts --crawl
+npx tsx src/cli.ts --site --limit 10      # or --preview, or SITE-001 SITE-069 …
+
 # Web app (http://localhost:4100 by default)
 npm start          # or: npm run dev  (tsx watch)
 
@@ -523,7 +558,7 @@ Notes:
 
 ### Add a page
 
-1. Add the name and synonyms to `PAGES` in `src/engine/pages.ts` (`pages.ts:2-42`).
+1. New dashboard pages are found by re-crawling (`npx tsx src/cli.ts --crawl`, or Re-crawl in the web app). Add a name to `PAGES` in `src/engine/pages.ts` only for a synonym the dashboard does not show.
 2. If it is a list page, look at `Ui.goto` (`ui.ts:72-82`, which has a hard-coded list of list-page paths) and the snapshot column names (`ui.ts:120-136`).
 3. For setup and cleanup, add endpoints to `apps/slshop/api.ts` and register cleanup through `CaseContext` so test records use the `BTB` prefix.
 
@@ -539,12 +574,12 @@ Notes:
 
 Full detail, evidence and a phased plan are in [Improvement scope and integration guide](improvements-and-integrations.md). A non-technical summary is in [the plain-English overview](how-it-works-overview.md).
 
-- **Understanding.** An offline probe (`scratch/probe/probe.ts`, preview only: no browser, no AI) of 49 hand-written issues across 31 dashboard areas found the rules understood 103 of 202 clauses (51%); 7 of 49 cases were fully understood. By style: quoted 97%, formal 44%, Jira pastes 39%, sloppy one-liners 29%. "Understood" includes catch-all rules that match without acting; excluding them gives 44%.
+- **Understanding.** An offline probe (`scratch/probe/probe.ts`, preview only: no browser, no AI) of 49 hand-written issues across 31 dashboard areas now finds the rules understand 158 of 202 clauses (78%, up from 51% before the October 2026 upgrade); 20 of 49 cases are fully understood. By style: quoted 97%, formal 84%, Jira pastes 68%, sloppy one-liners 53%. Excluding catch-all rules that match without acting gives 77%. The rest goes to live AI help when a key is set.
   - The second plain-click rule (`natural.ts:361-363`, no `i` flag) needs a lower-case verb and a capitalised name, so "Click Save" is not read; "Click the Save button" is read by the first plain-click rule.
   - Most expected-result regexes match one exact sentence.
   - The product-form gate is a single regex.
 - **Silent misreads.** `open dashboard page` falls back to the start page for unknown names (`steps.ts:292-305`). Broad catch-alls match sentences without acting. Neither reaches AI.
-- **Coverage.** Dedicated support exists for the products list, product form and POS only. Several pages are missing from `pages.ts` (for example categories, staff, reports). Double-quoted names are not read by the step language or the quoted-text fallback (only straight or curly single quotes).
+- **Coverage.** Dedicated support exists for the products list, product form and POS only. Every crawled page can be opened by name and gets a generic read-only site case (§6.6), but its own wording still needs AI or the step language. The site cases check health, heading, tabs, filter panel, search and next page only; they do not check that a search or filter actually narrows the list. Double-quoted names are not read by the step language or the quoted-text fallback (only straight or curly single quotes).
 - **Step language.** No variables or before/after comparisons, no arithmetic, no wait-for-condition, no row-scoped checks, and no hover, reload, back, new tab or download contents.
 - **Test data.** Only products and catalog items are cleaned up. Products are archived, not deleted. POS places real orders.
 - **AI.** Text-only page view; one repair try. Passing AI checks and AI-run steps are not flagged for review. Rewrites are not tied to a page. Safety is a prompt rule only.

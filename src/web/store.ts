@@ -12,7 +12,8 @@ import type { TestCase } from '../engine/sources/cases.js';
 export interface Suite {
   id: string;
   name: string;
-  source: { kind: 'sheet'; url: string } | { kind: 'upload'; file: string } | { kind: 'manual' };
+  /** 'site': one read-only case per crawled dashboard page, rebuilt from site-map.json (see apps/slshop/crawl.ts). */
+  source: { kind: 'sheet'; url: string } | { kind: 'upload'; file: string } | { kind: 'manual' } | { kind: 'site' };
   pagePath: string;
   cases: TestCase[];
   /** IDs of sheet rows deleted in the app; re-reading the sheet leaves them out. */

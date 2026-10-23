@@ -1,4 +1,5 @@
 import { Blocked, CaseContext, verdictFrom, type CaseResult } from '../context.js';
+import { config } from '../config.js';
 import type { Session } from '../session.js';
 import type { TestCase } from '../sources/cases.js';
 import { healthProblems, inspectPage } from '../inspect.js';
@@ -9,7 +10,7 @@ import { FORM_EXPECT_RULES } from './form-expects.js';
 import { ALL_STEP_RULES } from './natural.js';
 import { ACTION_EXPECTS, ACTION_RULES } from './actions.js';
 import { approved, type Kind } from '../ai/translate.js';
-import { liveEnabled, prepareAiProduct, recoverStep, understandExpect, understandStep } from '../ai/assist.js';
+import { CHANGE_CLAIM, liveEnabled, planRemember, prepareAiProduct, recoverStep, understandExpect, understandStep } from '../ai/assist.js';
 import { fallbackCheck, fallbackKind } from './fallback.js';
 import { applyFixtures, planFixtures } from './fixtures.js';
 import { expectClauses, stepClauses } from './split.js';
@@ -26,8 +27,8 @@ export interface Preview {
 }
 
 /** An approved AI rewrite for a sentence: its lines and the rule each line maps to. Lines no rule reads are dropped. */
-function rewrite(kind: Kind, text: string): { lines: { text: string; step?: StepRule; expect?: ExpectRule }[]; note: string } | null {
-  const a = approved(kind, text);
+function rewrite(kind: Kind, text: string, page?: string): { lines: { text: string; step?: StepRule; expect?: ExpectRule }[]; note: string } | null {
+  const a = approved(kind, text, page);
   if (!a) return null;
   const lines = a.lines.map((l) => ({ text: l, step: ACTION_RULES.find((r) => r.pattern.test(l)), expect: ACTION_EXPECTS.find((r) => r.pattern.test(l)) }));
   return { lines: lines.filter((l) => l.step || l.expect), note: a.note };
@@ -42,12 +43,54 @@ function expectRule(claim: string, form = false): ExpectRule | undefined {
   return (form ? FORM_EXPECT_RULES.find((r) => r.pattern.test(c)) : undefined) ?? EXPECT_RULES.find((r) => r.pattern.test(c)) ?? BEHAVIOUR_RULES.find((r) => r.pattern.test(c)) ?? ACTION_EXPECTS.find((r) => r.pattern.test(c));
 }
 
-/** A case is about the product form when one of its steps opens it (Add Product / Edit / Save Product). */
+/** A case is about the product form when one of its steps opens it (Add Product / Edit / Save Product / a new product). */
 export function aboutProductForm(tc: TestCase): boolean {
-  return /'add product'|add product button|'save product'|click 'edit' on|edit page|^edit a (?:variable |simple )?product|products\/(?:new|.*edit)/im.test([...tc.steps, tc.url].join('\n'));
+  return /'add product'|add product button|'save product'|click 'edit' on|edit page|^edit a (?:variable |simple )?product|products\/(?:new|.*edit)|\b(?:create|add) (?:a |an )?new product\b|\bcreate (?:a |an )?(?:simple |variable )?product\b(?! (?:to|in|from) )|\bopen (?:the )?new product (?:page|form)\b|\bproduct form\b/im.test([...tc.steps, tc.url].join('\n'));
 }
 
-function resolveClauses(sentence: string, form = false): { text: string; rule: StepRule | null; via?: 'ai' | 'live' }[] {
+/**
+ * Clicks that change or lose real data, cost money or end the session. Steps the AI wrote (live, recovered or an
+ * approved rewrite) may do these only on test records: the target is scoped to a 'BTB …' record, or the open dialog
+ * or the record open on the page is a BTB one. Steps written in the sheet itself are the tester's decision.
+ */
+const DESTRUCTIVE = /\b(?:delete|remove|archive|trash|cancel (?:the )?(?:order|subscription|plan|invoice)|refund|log ?out|sign ?out|deactivate|disable account|place order|complete sale|confirm (?:payment|order|sale)|pay(?: now)?|generate|write with ai|withdraw|recharge|top ?up|bulk|send|import|publish|void|disconnect|uninstall|empty cart|mark as (?:paid|delivered|shipped|cancelled))\b/i;
+/** Harmless uses of those words: removing a filter chip, clearing a search. */
+const HARMLESS = /\b(?:filters?|search|sort|selection|image preview)\b/i;
+const ACT_LINE = /^(?:double )?click ['"‘“](.+?)['"’”](?: (?:in|inside) ['"‘“](.+?)['"’”])?$|^(?:select|choose|pick) ['"‘“](.+?)['"’”] (?:in|from) ['"‘“](.+?)['"’”]$|^press ['"‘“](.+?)['"’”]$|^go to ['"‘“](.+?)['"’”]$/i;
+
+/** Why an AI-written line must not run here, or null when it is safe. */
+export async function refusal(t: CaseContext, line: string): Promise<string | null> {
+  const m = line.trim().match(ACT_LINE);
+  if (!m) return null;
+  const [, click, clickIn, option, control, key, go] = m;
+  const what = [click, option, control, key, go].filter(Boolean).join(' ');
+  if (go) return /log ?out|sign ?out/i.test(go) ? `AI step refused: "${line}" would log out.` : null;
+  const btb = new RegExp(`\\b${config.fixturePrefix}\\b`);
+  if (clickIn && btb.test(clickIn)) return null;
+  // "Confirm" / "Yes" in a dialog that asks to delete, cancel, refund … is the destructive click itself.
+  const confirmsDialog = !!click && /^(?:confirm|yes|ok|okay|continue|proceed|i understand|sure|agree)\b/i.test(click);
+  if ((!DESTRUCTIVE.test(what) || HARMLESS.test(what)) && !confirmsDialog) return null;
+  // The open dialog, or the record this page is about (a heading or a filled-in name), is a test record.
+  const here = await t.page.evaluate(() => {
+    const v = (e: Element) => e.getClientRects().length > 0;
+    const dlg = [...document.querySelectorAll('[role=dialog],[role=alertdialog]')].filter(v).at(-1) as HTMLElement | undefined;
+    const main = document.querySelector('main');
+    const heads = [...(main?.querySelectorAll('h1, h2') ?? [])].filter(v).map((h) => (h as HTMLElement).innerText).join(' ');
+    const values = [...(main?.querySelectorAll('input') ?? [])].filter(v).map((i) => (i as HTMLInputElement).value);
+    const ticked = [...(main?.querySelectorAll('tbody tr:has(input[type=checkbox]:checked)') ?? [])].map((r) => (r as HTMLElement).innerText.split('\n')[0]);
+    return { dialog: dlg?.innerText ?? '', heads, values, ticked };
+  }).catch(() => ({ dialog: '', heads: '', values: [] as string[], ticked: [] as string[] }));
+  if (confirmsDialog && !DESTRUCTIVE.test(what) && !(here.dialog && DESTRUCTIVE.test(here.dialog))) return null;
+  if (btb.test(here.dialog) || btb.test(here.heads) || here.values.some((x) => x.startsWith(`${config.fixturePrefix} `))) return null;
+  // A bulk action on ticked rows is fine only when every ticked row is a test record.
+  if (here.ticked.length && here.ticked.every((r) => btb.test(r))) return null;
+  return `AI step refused for safety: "${line}" would ${/bulk/i.test(what) ? 'run a bulk action' : `press '${what}'`} on real store data. AI steps may do this only on test records named '${config.fixturePrefix} …' (write it as CLICK '${click ?? what}' IN '${config.fixturePrefix} …').`;
+}
+
+/** Rules that match almost any wording but do nothing (or something generic): they never override an exact upper-case line. */
+const CATCH_ALL = new Set(['observe', 'look/check/compare', 'note', 'wait for load']);
+
+function resolveClauses(sentence: string, form = false, page?: string): { text: string; rule: StepRule | null; via?: 'ai' | 'live' }[] {
   const out: { text: string; rule: StepRule | null; via?: 'ai' | 'live' }[] = [];
   // Specific rules know the app (fixtures, waits, confirmations); the generic actions come after them.
   const rules = [...(form ? ALL_STEP_RULES : ALL_STEP_RULES.filter((r) => !r.formOnly)), ...ACTION_RULES];
@@ -55,7 +98,9 @@ function resolveClauses(sentence: string, form = false): { text: string; rule: S
   const whole = sentence.trim().replace(/\.$/, '');
   // A sentence written in the action language (an AI rewrite or typed that way) is one action as written.
   const exact = ACTION_RULES.find((r) => r.pattern.test(whole));
-  if (exact && /^(GO TO|CLICK|DOUBLE CLICK|TYPE|ENTER|FILL|CLEAR|SELECT|CHOOSE|PICK|TURN (ON|OFF)|CHECK|UNCHECK|TICK|UNTICK|PRESS|WAIT|UPLOAD)\b/.test(whole) && !rules.slice(0, -ACTION_RULES.length).some((r) => r.pattern.test(whole))) return [{ text: whole, rule: exact }];
+  // "CHECK 'Select all'" is a tick, not "check (look at)"; "PRESS 'Enter'" is a key, not a button named Enter.
+  const blocks = (r: StepRule) => !CATCH_ALL.has(r.name) && !(r.name === 'click named control' && !/^CLICK\b/.test(whole)) && r.pattern.test(whole);
+  if (exact && /^(GO TO|CLICK|DOUBLE CLICK|TYPE|ENTER|FILL|CLEAR|SELECT|CHOOSE|PICK|TURN (ON|OFF)|CHECK|UNCHECK|TICK|UNTICK|PRESS|WAIT|UPLOAD|REMEMBER|RELOAD|REFRESH|GO BACK|HOVER|SCROLL TO)\b/.test(whole) && !rules.slice(0, -ACTION_RULES.length).some(blocks)) return [{ text: whole, rule: exact }];
   if (form) {
     const rule = rules.find((r) => r.formOnly && r.pattern.test(whole));
     if (rule) return [{ text: whole, rule }];
@@ -83,12 +128,12 @@ function resolveClauses(sentence: string, form = false): { text: string; rule: S
   }
   // Pieces no rule reads: use an approved rewrite of the whole sentence, else of the piece itself.
   if (out.some((c) => !c.rule)) {
-    const all = rewrite('step', whole);
+    const all = rewrite('step', whole, page);
     if (all?.lines.length) return all.lines.filter((l) => l.step).map((l) => ({ text: l.text, rule: l.step!, via: 'ai' as const }));
     if (all && !all.lines.length) return [{ text: whole, rule: SKIPPED(all.note), via: 'ai' }];
     return out.flatMap((c) => {
       if (c.rule) return [c];
-      const r = rewrite('step', c.text);
+      const r = rewrite('step', c.text, page);
       if (!r) return [c];
       if (!r.lines.length) return [{ text: c.text, rule: SKIPPED(r.note), via: 'ai' as const }];
       return r.lines.filter((l) => l.step).map((l) => ({ text: l.text, rule: l.step!, via: 'ai' as const }));
@@ -109,8 +154,8 @@ function SKIPPED(note: string): StepRule {
 
 export function previewCase(tc: TestCase): Preview {
   const form = aboutProductForm(tc);
-  const steps = tc.steps.map((s) => ({ sentence: s, clauses: resolveClauses(s, form).map((c) => ({ text: c.text, rule: c.rule?.name ?? null, via: c.via })) }));
-  const expects = tc.expected.map((e) => ({ sentence: e, claims: resolveClaims(e, form).map((c) => ({ text: c.text, rule: c.rule, via: c.via })) }));
+  const steps = tc.steps.map((s) => ({ sentence: s, clauses: resolveClauses(s, form, tc.url).map((c) => ({ text: c.text, rule: c.rule?.name ?? null, via: c.via })) }));
+  const expects = tc.expected.map((e) => ({ sentence: e, claims: resolveClaims(e, form, tc.url).map((c) => ({ text: c.text, rule: c.rule, via: c.via })) }));
   const all = [...steps.flatMap((s) => s.clauses), ...expects.flatMap((e) => e.claims)];
   const unknown = [
     ...steps.filter((s) => s.clauses.some((c) => !c.rule)).map((s) => ({ kind: 'step' as const, text: s.sentence.trim().replace(/\.$/, '') })),
@@ -120,14 +165,19 @@ export function previewCase(tc: TestCase): Preview {
 }
 
 /** Expected-result claims with their check: a rule, the page fallback, or an approved rewrite into EXPECT lines. */
-function resolveClaims(sentence: string, form: boolean): { text: string; rule: string | null; check?: ExpectRule; via?: 'ai'; reviewedNote?: string }[] {
+function resolveClaims(sentence: string, form: boolean, page?: string): { text: string; rule: string | null; check?: ExpectRule; via?: 'ai'; reviewedNote?: string; remember?: boolean }[] {
+  const isRemember = (l: string) => /^REMEMBER\b/.test(l.trim()) && ACTION_RULES.some((r) => r.name.startsWith('remember') && r.pattern.test(l.trim()));
   return expectClauses(sentence).flatMap((c) => {
+    // "REMEMBER COUNT AS n" among the expected results: read before the steps run (see rememberBefore).
+    if (isRemember(c)) return [{ text: c, rule: 'remember (before the steps)', remember: true }];
     const rule = expectRule(c, form);
     if (rule) return [{ text: c, rule: rule.name, check: rule }];
-    const r = rewrite('expect', c);
-    if (r?.lines.length) return r.lines.map((l) => (l.expect
-      ? { text: l.text, rule: l.expect.name, check: l.expect, via: 'ai' as const }
-      : { text: l.text, rule: 'show first', check: SHOW(l.step!), via: 'ai' as const }));
+    const r = rewrite('expect', c, page);
+    if (r?.lines.length) return r.lines.map((l) => (isRemember(l.text)
+      ? { text: l.text, rule: 'remember (before the steps)', via: 'ai' as const, remember: true }
+      : l.expect
+        ? { text: l.text, rule: l.expect.name, check: l.expect, via: 'ai' as const }
+        : { text: l.text, rule: 'show first', check: SHOW(l.step!), via: 'ai' as const }));
     if (r) return [{ text: c, rule: 'not automated (reviewed)', via: 'ai' as const, reviewedNote: r.note }];
     return [{ text: c, rule: fallbackKind(c) }];
   });
@@ -167,12 +217,13 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
     await applyFixtures(t, plan);
     // When AI help may drive steps that change a product, create its test product now, before the page loads.
     const form = aboutProductForm(tc);
-    if (liveEnabled() && tc.steps.some((s) => resolveClauses(s, form).some((c) => !c.rule))) await prepareAiProduct(t);
+    if (liveEnabled() && tc.steps.some((s) => resolveClauses(s, form, tc.url).some((c) => !c.rule))) await prepareAiProduct(t);
     await t.ui.goto(startPath);
     await t.snap('start', 'initial');
+    await rememberBefore(t, form, onStep);
 
     // Steps are grouped by sentence, so live AI help can read a whole sentence it does not understand.
-    const groups = tc.steps.map((sentence) => ({ sentence: sentence.trim().replace(/\.$/, ''), clauses: resolveClauses(sentence, form) }));
+    const groups = tc.steps.map((sentence) => ({ sentence: sentence.trim().replace(/\.$/, ''), clauses: resolveClauses(sentence, form, tc.url) }));
     let stop = false;
     for (const [gi, g] of groups.entries()) {
       if (stop) break;
@@ -202,6 +253,12 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
           t.note(`Step not understood and skipped: "${clause.text}". Results after it may not reflect that step.`);
           continue;
         }
+        // AI-written lines (live or an approved rewrite) never delete, pay, log out … on real data.
+        const refused = clause.via ? await refusal(t, clause.text) : null;
+        if (refused) {
+          refuse(t, label, refused, via);
+          continue;
+        }
         try {
           const detail = await rule.run(t, clause.text.match(rule.pattern)!, clause.text);
           t.steps.push({ text: label, status: 'done', detail: detail || undefined, via });
@@ -228,36 +285,47 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
           }
           if (liveEnabled() && !t.noted.get(`__recovered:${clause.text}`)) {
             t.noted.set(`__recovered:${clause.text}`, true);
-            onStep?.(`Step failed, asking AI: ${clause.text}`);
             // Repair just this action (with the sentence it came from as context), not the whole sentence again.
+            // Up to REPAIR_TRIES corrections, each told what the earlier ones did and how they failed.
             const rest = g.clauses.slice(ci + 1).map((c) => c.text);
-            const fix = await recoverStep(t, clause.text, msg, { sentence: g.sentence, later: rest });
-            if (fix?.lines.length) {
+            const tried: { lines: string[]; error: string }[] = [];
+            let repaired = false;
+            for (let attempt = 0; attempt < REPAIR_TRIES && !repaired; attempt++) {
+              onStep?.(`Step failed, asking AI${attempt ? ` again (${attempt + 1})` : ''}: ${clause.text}`);
+              const fix = await recoverStep(t, clause.text, msg, { sentence: g.sentence, later: rest, tried });
+              if (!fix?.lines.length) break;
               const done: string[] = [];
-              let fixed = true;
+              let failed = '';
               for (const l of fix.lines) {
+                const no = await refusal(t, l.text);
+                if (no) { failed = no; refuse(t, `${l.text} (AI)`, no, 'ai'); break; }
                 try {
                   await l.rule.run(t, l.text.match(l.rule.pattern)!, l.text);
                   done.push(l.text);
                 } catch (e2) {
-                  fixed = false;
-                  t.note(`AI's corrected step "${l.text}" also failed: ${(e2 as Error).message.split('\n')[0].slice(0, 140)}`);
+                  failed = (e2 as Error).message.split('\n')[0].slice(0, 300);
+                  t.note(`AI's corrected step "${l.text}" also failed: ${failed.slice(0, 140)}`);
                   break;
                 }
               }
-              if (fixed) {
-                const fixes = (t.noted.get('__aiFixes') as Map<string, { text: string; rule: StepRule }[]> | undefined) ?? new Map();
-                fixes.set(clause.text, fix.lines);
-                t.noted.set('__aiFixes', fixes);
-                const why = msg.split('(found:')[0].trim();
-                t.steps.push({ text: label, status: 'done', detail: `As written it failed (${why.slice(0, 120)}); the AI did instead: ${done.join(' → ')}`, via: 'ai' });
-                t.note(`"${clause.text}" failed as written; the AI's corrected version worked: ${done.join(' → ')} (${fix.model}).`);
-                // Not a pass for the step as written: a person decides whether the sheet's wording or the app is wrong.
-                t.skip(`Step as written: "${clause.text}"`, `${why}. The AI continued with: ${done.join(' → ')}. If the sheet is right, this is a finding (for example a renamed or missing button); otherwise update the step.`);
-                await t.snap(clause.text);
+              if (failed) {
+                tried.push({ lines: fix.lines.map((l) => l.text), error: done.length ? `after ${done.join(' → ')}: ${failed}` : failed });
+                // A refused line is not retried in another form: the AI was told the rule and chose it anyway.
+                if (/refused/.test(failed)) break;
                 continue;
               }
+              const fixes = (t.noted.get('__aiFixes') as Map<string, { text: string; rule: StepRule }[]> | undefined) ?? new Map();
+              fixes.set(clause.text, fix.lines);
+              t.noted.set('__aiFixes', fixes);
+              const why = msg.split('(found:')[0].trim();
+              t.steps.push({ text: label, status: 'done', detail: `As written it failed (${why.slice(0, 120)}); the AI did instead: ${done.join(' → ')}${attempt ? ` (try ${attempt + 1})` : ''}`, via: 'ai' });
+              t.note(`"${clause.text}" failed as written; the AI's corrected version worked${attempt ? ` on try ${attempt + 1}` : ''}: ${done.join(' → ')} (${fix.model}).`);
+              // Not a pass for the step as written: a person decides whether the sheet's wording or the app is wrong.
+              t.skip(`Step as written: "${clause.text}"`, `${why}. The AI continued with: ${done.join(' → ')}. If the sheet is right, this is a finding (for example a renamed or missing button); otherwise update the step.`);
+              await t.snap(clause.text);
+              repaired = true;
             }
+            if (repaired) continue;
           }
           t.steps.push({ text: label, status: 'failed', detail: msg, via });
           await t.shot('step failed');
@@ -274,9 +342,10 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
     await t.shot('end');
 
     for (const sentence of tc.expected) {
-      for (const resolved of resolveClaims(sentence, aboutProductForm(tc))) {
+      for (const resolved of resolveClaims(sentence, form, tc.url)) {
         const claim = resolved.text;
         const rule = resolved.check;
+        if (resolved.remember) continue;
         if (resolved.reviewedNote !== undefined) {
           t.skip(claim, resolved.reviewedNote || 'Marked as not automatable when the AI suggestion was reviewed; check it by hand.');
           continue;
@@ -288,6 +357,10 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
             t.note(`AI read the expected result "${claim}" as: ${ai.lines.map((l) => l.text).join(' · ')} (${ai.model}).`);
             for (const l of ai.lines) {
               if ('step' in l) {
+                // A REMEMBER now would read the value after the steps, not before: it cannot help this check.
+                if (/^REMEMBER\b/i.test(l.text)) continue;
+                const no = await refusal(t, l.text);
+                if (no) { t.note(no); continue; }
                 // Show the tab / section the check is about first.
                 await l.step.run(t, l.text.match(l.step.pattern)!, l.text).catch((e) => t.note(`Could not open what "${claim}" is about (${l.text}): ${(e as Error).message.split('\n')[0].slice(0, 120)}`));
                 continue;
@@ -296,6 +369,7 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
               await l.check.check(t, l.text.match(l.check.pattern)!, l.text).catch((e) => t.skip(l.text, `Could not check: ${(e as Error).message.split('\n')[0]}`));
               for (const c of t.checks.slice(before)) {
                 c.label = `${claim} → AI checked: ${l.text.replace(/^EXPECT /, '').toLowerCase()}`;
+                c.by = 'ai';
                 // An AI-written check that does not hold may be a real bug or a misreading; a person decides.
                 if (c.state === 'fail') {
                   c.state = 'review';
@@ -309,6 +383,9 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
           continue;
         }
         const before = t.checks.length;
+        // A 'show first' line of an approved rewrite is a step: the same safety rule as other AI steps.
+        const no = resolved.via && rule.name === 'show first' ? await refusal(t, claim) : null;
+        if (no) { t.note(no); continue; }
         try {
           await rule.check(t, claim.match(rule.pattern)!, claim);
         } catch (e) {
@@ -340,6 +417,51 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
 }
 
 class StepStop extends Error {}
+
+/** Corrections the AI may try for one failing step (each sees the earlier ones and their errors). */
+const REPAIR_TRIES = Math.max(1, Number(process.env.AI_REPAIR_TRIES ?? 2));
+
+/** Logs an AI line the safety guard refused: a skipped step, a note, and a skip check so the case cannot be a plain Pass. */
+function refuse(t: CaseContext, label: string, why: string, via: 'rules' | 'approved' | 'ai'): void {
+  t.steps.push({ text: label, status: 'skipped', detail: why, via });
+  t.note(why);
+  t.skip(`AI step not run: ${label.replace(/ \(AI.*\)$/, '')}`, why);
+}
+
+/**
+ * Before the steps: expected results about a change ("should increase by 2", "the count should go down") need the
+ * value as it was. Claims the rules already read keep their own before/after logic; for the rest, the AI says which
+ * values to REMEMBER now, and the expected-result AI later compares with those names.
+ */
+async function rememberBefore(t: CaseContext, form: boolean, onStep?: (text: string) => void): Promise<void> {
+  // Written in the step language by hand or by an approved rewrite: run those REMEMBER lines as they are.
+  const own = t.tc.expected.flatMap((e) => resolveClaims(e, form, t.tc.url)).filter((c) => c.remember);
+  for (const c of own) await runRemember(t, c.text, c.via ? 'approved' : 'rules');
+  if (!liveEnabled()) return;
+  const changes = t.tc.expected.flatMap((e) => resolveClaims(e, form, t.tc.url)).filter((c) => !c.check && !c.reviewedNote && CHANGE_CLAIM.test(c.text) && !fallbackKind(c.text)).map((c) => c.text);
+  if (!changes.length) return;
+  onStep?.(`Asking AI what to note before the steps: ${changes.join(' / ').slice(0, 80)}`);
+  const plan = await planRemember(t, changes);
+  if (!plan?.lines.length) {
+    if (plan) t.note(`AI found nothing to note before the steps for "${changes.join(' / ')}": ${plan.note || 'no reason given'}.`);
+    return;
+  }
+  for (const l of plan.lines) await runRemember(t, l.text, 'ai');
+  t.note(`Before the steps, the AI noted: ${plan.lines.map((l) => l.text).join(' · ')} (${plan.model}), to compare after them.`);
+}
+
+async function runRemember(t: CaseContext, line: string, via: 'rules' | 'approved' | 'ai'): Promise<void> {
+  const rule = ACTION_RULES.find((r) => r.pattern.test(line));
+  if (!rule) return;
+  const no = await refusal(t, line);
+  if (no) return refuse(t, `${line} (before the steps)`, no, via);
+  try {
+    const detail = await rule.run(t, line.match(rule.pattern)!, line);
+    t.steps.push({ text: `${line} (before the steps${via === 'ai' ? ', AI' : ''})`, status: 'done', detail: detail || undefined, via });
+  } catch (e) {
+    t.steps.push({ text: `${line} (before the steps)`, status: 'skipped', detail: (e as Error).message.split('\n')[0].slice(0, 200), via });
+  }
+}
 
 /** Rejects if `work` takes longer than `ms` (the work itself keeps running in the background and is ignored). */
 function withTimeout<T>(work: Promise<T>, ms: number, what: string): Promise<T> {

@@ -3,7 +3,7 @@ import { healthProblems } from '../inspect.js';
 import { lc, quoted, words } from './text.js';
 
 const LOGIN_REDIRECT = /redirect(?:ed|s)? to (?:the )?(?:login|sign[- ]?in)/i;
-const HEALTH = /\b(no|without|not show) (?:any )?(?:errors?|console errors?|crash)|should not (?:go blank|freeze|crash|break)|\b(?:load|open)s? (?:normally|correctly|successfully|fine|without)|should (?:load|open)\b(?! .*['‘"])/i;
+const HEALTH = /\b(no|without|not show) (?:any )?(?:errors?|console errors?|crash)|should not (?:go blank|freeze|crash|break)|\b(?:load|open)s? (?:normally|correctly|successfully|fine|without)|\b(?:page|screen|dashboard|site|app|it)\b[\w\s]{0,20}\bshould (?:load|open)\b(?! .*['‘"“])/i;
 const BROKEN_VALUES = /\b(?:NaN|undefined|blank values?|empty values?)\b/i;
 
 /** Name of the fallback check that would handle this claim, or null. Used by the preview. */
@@ -21,7 +21,7 @@ export function fallbackKind(claim: string): string | null {
  * Anything else stays "not checked", with what the page showed, so a person can compare.
  */
 export async function fallbackCheck(t: CaseContext, claim: string): Promise<boolean> {
-  const negative = /\b(?:should|must|does|do|will)\s*(?:not|n't)\b|\bno\s+['‘"]|\bnever\b|\bwithout\b/i.test(claim);
+  const negative = /\b(?:should|must|does|do|will)\s*(?:not|n['’]t)\b|\b(?:should|must)(?:n['’]t)\b|\bno\s+['‘"“]|\bnever\b|\bwithout\b/i.test(claim);
   const page = await pageText(t);
   let handled = false;
 
@@ -67,7 +67,7 @@ function present(page: string, text: string): boolean {
 }
 
 /** " (closest on the page: 'A', 'B')" — page lines sharing the most words with the wanted text. */
-function nearest(page: string, text: string): string {
+export function nearest(page: string, text: string): string {
   const want = new Set(words(text).split(' ').filter((w) => w.length > 2));
   if (!want.size) return '';
   const lines = [...new Set(page.split('\n').map((l) => l.trim()).filter((l) => l && l.length < 80))];

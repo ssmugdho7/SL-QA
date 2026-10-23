@@ -4,37 +4,43 @@ const OPENS_QUOTE = /[\s(=/[]/;
 const CLOSES_QUOTE = /[\s.,;:)!?/\]]/;
 const HIDDEN = '\u0001';
 
-/**
- * Hides quoted text ('…') and bracketed text ((…)) so separators inside them are ignored.
- * Apostrophes inside words ("store's") are not treated as quotes.
- */
-export function mask(text: string): string {
-  let out = '';
-  let inQuote = false;
+/** Quote pairs: a quote opens after a space or bracket and closes with its partner before a space or punctuation. */
+const PAIRS: Record<string, string> = { "'": "'’", '‘': "’'", '"': '"', '“': '”"' };
+
+/** [open, close] index pairs of the quoted parts ('…', "…", ‘…’, “…”); an apostrophe inside a word ("Don't") does not close one. */
+function quoteSpans(text: string): [number, number][] {
+  const spans: [number, number][] = [];
   let depth = 0;
   for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    const prev = i === 0 ? ' ' : text[i - 1];
-    const next = i === text.length - 1 ? ' ' : text[i + 1];
-    if (depth === 0 && !inQuote && (ch === "'" || ch === '‘') && OPENS_QUOTE.test(prev)) {
-      inQuote = true;
-      out += HIDDEN;
-    } else if (inQuote && (ch === "'" || ch === '’') && CLOSES_QUOTE.test(next)) {
-      inQuote = false;
-      out += HIDDEN;
-    } else if (inQuote) {
-      out += HIDDEN;
-    } else if (ch === '(') {
-      depth++;
-      out += HIDDEN;
-    } else if (ch === ')' && depth > 0) {
-      depth--;
-      out += HIDDEN;
-    } else {
-      out += depth > 0 ? HIDDEN : ch;
+    if (ch === '(') depth++;
+    else if (ch === ')' && depth > 0) depth--;
+    if (depth > 0 || !PAIRS[ch] || !OPENS_QUOTE.test(i === 0 ? ' ' : text[i - 1])) continue;
+    let end = -1;
+    for (let j = i + 1; j < text.length; j++) {
+      if (PAIRS[ch].includes(text[j]) && CLOSES_QUOTE.test(j === text.length - 1 ? ' ' : text[j + 1])) { end = j; break; }
     }
+    // A quote that never closes is plain text (an inch mark, a stray apostrophe), not the start of a hidden span.
+    if (end < 0) continue;
+    spans.push([i, end]);
+    i = end;
   }
-  return out;
+  return spans;
+}
+
+/**
+ * Hides quoted text ('…', "…", curly quotes) and bracketed text ((…)) so separators inside them are ignored.
+ * Apostrophes inside words ("store's", 'Don't show') are not treated as quotes.
+ */
+export function mask(text: string): string {
+  const out = text.split('');
+  for (const [a, b] of quoteSpans(text)) for (let i = a; i <= b; i++) out[i] = HIDDEN;
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (out[i] === HIDDEN) continue;
+    if (text[i] === '(') { depth++; out[i] = HIDDEN; } else if (text[i] === ')' && depth > 0) { depth--; out[i] = HIDDEN; } else if (depth > 0) out[i] = HIDDEN;
+  }
+  return out.join('');
 }
 
 /** Splits at `sep` (a global regex), ignoring separators inside quotes or brackets. Keeps each piece's leading separator. */
@@ -57,31 +63,57 @@ export function splitAt(text: string, sep: RegExp): string[] {
   return splitKeep(text, sep).map((p) => p.text);
 }
 
-/** Quoted values in a sentence: "Click 'Add Product'" → ["Add Product"]. */
+/** Quoted values in a sentence: "Click 'Add Product'" → ["Add Product"]; double and curly quotes too ('Error "Name is required"'). */
 export function quoted(text: string): string[] {
-  const masked = mask(text);
-  const out: string[] = [];
-  let start = -1;
-  for (let i = 0; i < text.length; i++) {
-    const hidden = masked[i] === HIDDEN && (text[i] === "'" || text[i] === '‘' || text[i] === '’');
-    if (!hidden) continue;
-    if (start < 0 && (i === 0 || masked[i - 1] !== HIDDEN || text[i - 1] === ' ')) start = i;
-    else if (start >= 0) {
-      out.push(text.slice(start + 1, i));
-      start = -1;
-    }
-  }
-  return out;
+  return quoteSpans(text).map(([a, b]) => text.slice(a + 1, b));
 }
 
 /** "A, B, C and D" → ["A", "B", "C", "D"] (quotes removed). */
 export function listItems(text: string): string[] {
   return splitAt(text.replace(/\.$/, ''), /\s*,\s*(?:and\s+)?|\s+and\s+/g)
-    .map((s) => s.replace(/^['‘]|['’]$/g, '').trim())
+    .map((s) => s.replace(/^['‘"“]|['’"”]$/g, '').trim())
     .filter(Boolean);
 }
 
 export const lc = (s: string) => s.toLocaleLowerCase();
+
+/** Words after "on/for" that mean "a record in a list" ("Click Edit on any product", "Open a pending order"). */
+export const RECORD = '(?:product|order|customer|row|record|item|entry|category|brand|label|coupon|user|staff(?: member)?|supplier|post|review|shipment|invoice|transaction|expense|party|warehouse|campaign|page|role)';
+
+type Accept = (m: RegExpExecArray) => boolean;
+
+/** A RegExp that matches only when `ok` also accepts the match (Title Case names, word lists a pattern cannot say). Nests. */
+export function when(re: RegExp, ok: Accept): RegExp {
+  const prev = (re as RegExp & { accept?: Accept }).accept;
+  const accept: Accept = prev ? (m) => prev(m) && ok(m) : ok;
+  return Object.assign(new (class extends RegExp {
+    exec(s: string): RegExpExecArray | null {
+      const m = super.exec(s);
+      return m && accept(m) ? m : null;
+    }
+  })(re.source, re.flags), { accept });
+}
+
+const SMALL_WORD = /^(?:of|and|or|to|with|for|the|a|an|in|on|by|per|vs|&|\/|-|\+)$/i;
+
+/** "Save Changes", "Send to Courier", "SSLCommerz", "A5": words a person reads on a button or label (Title Case, up to 6 words). */
+export function isLabel(s: string): boolean {
+  const w = s.trim().split(/\s+/);
+  return w.length <= 6 && w.every((x, i) => /^[\p{Lu}\d৳#][\p{L}\p{N}'’&./%+-]*$/u.test(x) || (i > 0 && i < w.length - 1 && SMALL_WORD.test(x)));
+}
+
+/**
+ * "Total Sales, Total Orders and Total Customers" → the names, when each reads like a label on screen: quoted, or
+ * Title Case words ("Save Changes", "Money with Courier"). Plain descriptions ("the new store name") → null.
+ */
+export function uiNames(text: string): string[] | null {
+  const t = text.trim().replace(/^(?:the|all|both)\s+/i, '');
+  const whole = quoted(t);
+  if (whole.length && whole.join('').length >= t.length - 2 * whole.length - 8 && /^['"‘“]/.test(t)) return whole.filter((q) => q.trim());
+  const items = listItems(t);
+  if (!items.length) return null;
+  return items.every(isLabel) ? items : null;
+}
 
 export const words = (s: string) => lc(s).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 

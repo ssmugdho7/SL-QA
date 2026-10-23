@@ -26,6 +26,18 @@ To protect the app with a password, set `APP_PASSWORD` in `.env`. The browser wi
 
 A step-by-step guide for non-technical users is built into the app at **/help** (**How to use** in the top menu). It ends with a worked example: one click creates a 4-case suite (`src/web/example.ts`; three pass, one fails on purpose), and the guide walks through running it, reading the finding, fixing the case and writing your own.
 
+### Check the whole dashboard (no cases to write)
+
+On the Suites page, **🔎 Check the whole dashboard** makes a suite, *Whole dashboard (auto)*, with one case per dashboard page (about 140: every sidebar link with its groups opened, report pages, settings sub-pages and section tabs that change the URL). Each case checks that the page loads without errors, shows no NaN/undefined values and shows its heading, then tries the page's safe controls: the next page of a list, up to 4 status tabs, opening and closing the Filter panel, and typing `test` in the search box. It never creates, saves, deletes, imports or sends anything. Live AI help is off for these runs, so a step that fails is reported, not improvised. Tick the pages to check and press Run, like any suite.
+
+The page list comes from a **site map**, `src/engine/apps/slshop/site-map.json`, made by a read-only crawler (`src/engine/apps/slshop/crawl.ts`, about 5 minutes). It holds UI labels only (paths, headings, tabs, buttons, field labels, column headers, filter names), never store data. The button crawls when there is no site map or it is over 7 days old; **↻ Re-crawl** refreshes it on demand. The same map teaches the bot every page name, so steps such as *Open Products › Categories*, *Go to Settings > Tax* or *Navigate to Categories under Products* work, and the **Page link** field on **＋ Add case** suggests known pages.
+
+```sh
+npm run cli -- --crawl                       # walk the dashboard, write the site map, print a summary
+npm run cli -- --site --preview              # how each page case is read
+npm run cli -- --site --limit 10             # check a spread of 10 pages (or name IDs: SITE-004 SITE-069)
+```
+
 ### Adding and deleting issues by hand
 
 - **No sheet:** on the home page, tick *Start with an empty list…* to create a suite you fill in by hand.
@@ -96,7 +108,8 @@ Cases that change data create their own products, named `BTB <case id> …`, and
 ```
 src/engine/
   sources/      Google Sheet / CSV / XLSX / pasted bug report (bug-text.ts) → test cases
-  pages.ts      page names ("Create order/POS", "Orders") → dashboard paths
+  pages.ts      page names ("Create order/POS", "Products › Categories") → dashboard paths; pageInfo() per page
+  apps/slshop/  REST client, product-form driver, crawl.ts (site map + whole-dashboard cases), site-map.json
   phrases/
     split.ts    sentence → separate actions / claims
     steps.ts    step rules: wording → browser action
@@ -122,4 +135,5 @@ Command line (optional):
 npm run cli -- "<sheet link or file>" --preview          # how each sentence is read
 npm run cli -- "<sheet link or file>" PL-001 PL-021      # run cases, write runs/<time>/report.md and ./report.md
 npm run cli -- --url /dashboard/orders --expect "'Orders' should be shown"   # check one page without a sheet
+npm run cli -- --site --limit 10                          # check a sample of dashboard pages from the site map
 ```
