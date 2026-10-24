@@ -2,7 +2,7 @@
 
 This guide is for engineers joining the project. It explains what SL QA does, what it is built with, and how one test case moves from a sheet row to a verdict in a report. File references are to the repo root, `/Volumes/mySSD/projects/bug-triage-bot`. Line numbers are approximate and will drift as the code changes.
 
-**Related docs:** [Plain-English overview](how-it-works-overview.md) · [Improvement scope and integration guide](improvements-and-integrations.md)
+**Related docs:** [Plain-English overview](how-it-works-overview.md)
 
 > Secrets: this document lists `.env` variable **names** only. Never paste values from `.env`, `.auth/` or `data/` into docs, issues or AI prompts.
 
@@ -572,7 +572,7 @@ Notes:
 
 ## 13. Known limitations (summary)
 
-Full detail, evidence and a phased plan are in [Improvement scope and integration guide](improvements-and-integrations.md). A non-technical summary is in [the plain-English overview](how-it-works-overview.md).
+A non-technical summary is in [the plain-English overview](how-it-works-overview.md).
 
 - **Understanding.** An offline probe (`scratch/probe/probe.ts`, preview only: no browser, no AI) of 49 hand-written issues across 31 dashboard areas now finds the rules understand 158 of 202 clauses (78%, up from 51% before the October 2026 upgrade); 20 of 49 cases are fully understood. By style: quoted 97%, formal 84%, Jira pastes 68%, sloppy one-liners 53%. Excluding catch-all rules that match without acting gives 77%. The rest goes to live AI help when a key is set.
   - The second plain-click rule (`natural.ts:361-363`, no `i` flag) needs a lower-case verb and a capitalised name, so "Click Save" is not read; "Click the Save button" is read by the first plain-click rule.

@@ -134,4 +134,4 @@ SL QA works on the **real, live store**, so it is built to be careful, but it is
 
 ## What's next?
 
-For the full technical picture, see [How SL QA works (technical)](how-it-works-technical.md). The [improvements and integrations plan](improvements-and-integrations.md) lists the quick fixes, medium projects and bigger upgrades proposed to help SL QA understand more pages and more writing styles, and to make it safer.
+For the full technical picture, see [How SL QA works (technical)](how-it-works-technical.md).
