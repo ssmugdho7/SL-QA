@@ -12,7 +12,7 @@ import { cancel, crawlState, enqueue, recover, startCrawl, syncSiteSuite } from 
 import { loadSiteMap, siteCases, siteMapAge } from '../engine/apps/slshop/crawl.js';
 import { knownPages } from '../engine/pages.js';
 import { newId, runs, suites, uploadsDir, type Run, type Suite } from './store.js';
-import { aiKeysPage, helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow, type SiteInfo } from './views.js';
+import { aiKeysPage, examplePage, helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow, type SiteInfo } from './views.js';
 import { previewCase } from '../engine/phrases/index.js';
 import { expectClauses, stepClauses } from '../engine/phrases/split.js';
 
@@ -346,6 +346,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="sl-qa-${p.includes('example') ? 'example' : 'sample'}.csv"` });
     return void res.end(`\uFEFF${p.includes('example') ? exampleCsv() : SAMPLE_CSV}`);
   }
+
+  if (p === '/example' && !post) return send(res, 200, examplePage(suites.all().find((s) => s.name === EXAMPLE_SUITE_NAME)?.id));
 
   // The help page's worked example: one click makes a suite with the example cases (or reopens it).
   if (p === '/help/example' && post) {

@@ -1,7 +1,7 @@
 import { aiChecked, type CaseResult, type Check, type Verdict } from '../engine/context.js';
 import { previewCase } from '../engine/phrases/index.js';
 import type { TestCase } from '../engine/sources/cases.js';
-import { EXAMPLE_CASES, EXAMPLE_JIRA } from './example.js';
+import { EXAMPLE_CASES, EXAMPLE_JIRA, EXAMPLE_SUITE_NAME } from './example.js';
 import type { Translation } from '../engine/ai/translate.js';
 import type { Run, Suite } from './store.js';
 
@@ -112,6 +112,7 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
         <td class="num">${s.cases.length}</td>
         <td class="nowrap">${coverage(understood, total)}</td>
         <td>${last ? `<a href="/runs/${last.id}">${statusBadge(last)}</a><div class="counts">${counts(last.results)}</div><div class="sub nowrap">${when(last.createdAt)}</div>` : '<span class="sub">Never run</span>'}</td>
+        <td class="row-actions"><form method="post" action="/suites/${s.id}/delete" class="inline" onsubmit="return confirm('Delete the suite &quot;${esc(s.name).replace(/'/g, '')}&quot; and its cases? Past runs stay under Runs.')"><button class="danger" aria-label="Delete ${esc(s.name)}">Delete</button></form></td>
       </tr>`;
     })
     .join('');
@@ -122,10 +123,10 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
     `<div class="page-head"><div><h1>Test suites</h1><p class="sub">A suite is one list of cases (test cases or bugs) for the bot to check on slshop.cloud.</p></div>
       <div class="toolbar"><a class="button" href="#site">🔎 Check the whole dashboard</a><a class="button primary" href="#add">＋ New suite</a></div></div>
     ${site ? siteCard(site) : ''}
-    ${all.length ? wrap(`<table><thead><tr><th>Suite</th><th class="num">Cases</th><th>Understood by the bot</th><th>Last run</th></tr></thead><tbody>${rows}</tbody></table>`)
-      : `<div class="empty"><b>No suites yet.</b><br>Add your first list of cases below: a Google Sheet, a file, or type them in by hand.<br><a href="/help">New here? Read How to use</a> · <a href="/help/sample.csv">Download a sample sheet</a></div>`}
-    <section class="card" id="add">
-      <h2>Add a test suite</h2>
+    ${all.length ? wrap(`<table><thead><tr><th>Suite</th><th class="num">Cases</th><th>Understood by the bot</th><th>Last run</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)
+      : `<div class="empty"><b>No suites yet.</b><br>Add your first list of cases below: a Google Sheet, a file, or type them in by hand.<br><a href="/help">New here? Read How to use</a> · <a href="/example">Try the example suite</a> · <a href="/help/sample.csv">Download a sample sheet</a></div>`}
+    <details class="card" id="add"${error || typed ? ' open' : ''}>
+      <summary><h2 style="display:inline">Add a test suite</h2></summary>
       ${error ? `<div class="alert" role="alert">${esc(error)}</div>` : ''}
       <form method="post" action="/suites" enctype="multipart/form-data" class="stack" id="add-suite">
         <label>Name <input name="name" value="${esc(f.name)}" placeholder="Products page" required maxlength="120"></label>
@@ -141,9 +142,11 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
         <p class="hint">The sheet needs an <b>Expected Result</b> column, or a <b>Description</b> column holding a whole bug report pasted from Jira. A <b>URL</b> column tells the bot which page each row is about. <a href="/help#sheet">Sheet format</a> · <a href="/help/sample.csv">Sample sheet</a></p>
         <div><button class="primary">Add suite</button></div>
       </form>
-    </section>
+    </details>
     <script>
       (function () {
+        if (location.hash === '#add') document.getElementById('add').open = true;
+        window.addEventListener('hashchange', () => { if (location.hash === '#add') document.getElementById('add').open = true; });
         const form = document.getElementById('add-suite');
         const sync = () => {
           const kind = form.querySelector('input[name=kind]:checked').value;
@@ -577,6 +580,29 @@ export const SAMPLE_CSV = [
   `TC-3,https://slshop.cloud/dashboard/customers,Customers can be exported,Low,1. Open the customers page,• An 'Export page' button should be visible.`,
 ].join('\n');
 
+/** The worked example's 4 cases, as shown on the help page and the example suite page. */
+function exampleTable(): string {
+  return `<table class="stack-sm example-cases"><thead><tr><th>ID</th><th>Page</th><th>Steps</th><th>Expected result</th></tr></thead><tbody>
+        ${EXAMPLE_CASES.map((c) => `<tr><td><b>${esc(c.id)}</b><div class="sub">${esc(c.title)}</div></td><td><code>${esc(c.url)}</code></td><td>${c.steps.map((x) => esc(x)).join('<br>')}</td><td>${c.expected.map((x) => `• ${esc(x)}`).join('<br>')}${c.reported ? `<div class="sub">What the tester saw: ${esc(c.reported)}</div>` : ''}</td></tr>`).join('')}
+      </tbody></table>`;
+}
+
+/** The example suite, filled in and ready: one click on Add suite creates it. */
+export function examplePage(existingId?: string): string {
+  return layout(
+    'Example suite',
+    `<p class="crumbs"><a href="/">Suites</a> /</p>
+    <div class="page-head"><div><h1>${esc(EXAMPLE_SUITE_NAME)}</h1>
+      <p class="sub">Typed in by hand · start page <code>/dashboard</code> · ${EXAMPLE_CASES.length} cases. They only open pages and read them; nothing in the store changes. EX-4 fails on purpose.</p></div></div>
+    ${existingId ? `<div class="alert info" role="status">You already have this suite. Adding it again puts back any example case you deleted and keeps your own changes. <a href="/suites/${existingId}">Open it</a></div>` : ''}
+    <section class="card example">
+      ${exampleTable()}
+      <form method="post" action="/help/example" class="toolbar"><button class="primary">＋ Add suite</button><a class="button" href="/help#example">Read the guide</a></form>
+    </section>`,
+    { section: 'suites' },
+  );
+}
+
 export function helpPage(): string {
   return layout(
     'How to use',
@@ -584,7 +610,85 @@ export function helpPage(): string {
     <h1>How to use SL QA</h1>
     <p class="lead">SL QA is a robot tester for the slshop.cloud dashboard. You give it a list of things that <b>should</b> be true, such as <i>"the Add Product button is visible"</i>. It opens each page in a real browser, logged in as the store owner, and checks them one by one. Then it writes a report: what works, what doesn't, and where the problem is.</p>
     <p>You don't need to write any code. If you can fill in a spreadsheet, you can use it. It follows fixed rules first, so the same list gives the same answer every time. Only when a sentence is outside its rules, or a step fails on the page, does it ask an AI for help (if an AI key is set; see <a href="#ai">AI help</a>). Pass and Fail always come from the bot's own checks.</p>
-    <div class="tip"><b>Learn by doing:</b> the <a href="#example">worked example</a> at the end of this page sets up 4 ready-made cases in one click, runs them, and shows you how to read the result and write your own. It takes about 5 minutes.</div>
+
+    <section id="example" class="example"><h2><span class="num">★</span> Try it: a worked example</h2>
+      <p>The quickest way to learn SL QA is to run something small and look at the result. This example has <b>4 cases</b> about real slshop.cloud pages. Three pass, and one <b>fails on purpose</b> so you can see what a problem looks like and how to fix it. It only opens pages and reads them; nothing in the store changes.</p>
+
+      <h3>Step 1: Create the example suite</h3>
+      <p><a class="button primary" href="/example">＋ Open the example suite</a> <span class="sub">It opens the suite already filled in; click <b>Add suite</b> there. Or <a href="/help/example.csv" download>download it as a sheet</a> and add it yourself, as in steps 1–2 below.</span></p>
+      <p>It holds these 4 cases. Each row is one case: <i>go to this page, do these steps, this should be true</i>.</p>
+      ${exampleTable()}
+      <p class="sub">Notice the <b>'single quotes'</b> around button and title names. That tells the bot exactly what to look for on the page.</p>
+
+      <h3>Step 2: Run it</h3>
+      <ol>
+        <li>On the suite page, all 4 cases are ticked. The <b>Understood</b> column says <span class="ok">✓ all</span> for each, so the bot can read every sentence.</li>
+        <li>Click <b>▶ Run all 4</b>. The run page opens and shows which case is being checked.</li>
+        <li>Wait about <b>1–2 minutes</b> (around 20 seconds per case).</li>
+      </ol>
+
+      <h3>Step 3: Read the result</h3>
+      <p>When it finishes, you should see <span class="count pass">3 Pass</span> <span class="count fail">1 Fail</span>, and the status <b>Finished · issues found</b>.</p>
+      <table class="stack-sm"><thead><tr><th>Case</th><th>Result</th><th>What it means</th></tr></thead><tbody>
+        <tr><td><b>EX-1</b> Orders page</td><td>${verdictBadge('Pass')}</td><td>The title 'Orders' was on the page, and the page loaded with no errors and no failed requests.</td></tr>
+        <tr><td><b>EX-2</b> Products buttons</td><td>${verdictBadge('Pass')}</td><td>Both buttons were found.</td></tr>
+        <tr><td><b>EX-3</b> Filter panel</td><td>${verdictBadge('Pass')}</td><td>The bot clicked <i>Filter</i> (a <b>step</b>), then found the <i>Done</i> button in the panel that opened.</td></tr>
+        <tr><td><b>EX-4</b> Customers export</td><td>${verdictBadge('Fail')}</td><td>There is no button called 'Export Customers CSV' on that page.</td></tr>
+      </tbody></table>
+      <p>Click <b>View report</b>. Under <b>Findings</b>, EX-4 reads like this:</p>
+      <div class="finding-demo">
+        <p><b>EX-4: Customers page has a CSV export button</b></p>
+        <ul>
+          <li><b>Reported by the tester:</b> I could not find a button to export customers as CSV.</li>
+          <li><b>Expected:</b> 'Export Customers CSV' is shown<br>
+            <b>Actual:</b> not on the page (closest on the page: 'Customers', 'Export page', 'Customers List')<br>
+            <b>Likely cause:</b> The text or control the sheet names is missing, renamed or hidden on this page.</li>
+        </ul>
+        <p class="sub">…followed by a screenshot of the page.</p>
+      </div>
+      <p>The useful part is <b>"closest on the page"</b>. The bot didn't just say "missing"; it lists what it <i>did</i> find. Here, <b>'Export page'</b> is the real name of the button. So you now know one of two things: the button was named differently than you thought, or it was renamed and that's the bug to report.</p>
+      <p class="sub">Your numbers may differ slightly if the site has changed since this guide was written. That's what the tool is for.</p>
+
+      <h3>Step 4: Fix the case and run it again</h3>
+      <ol>
+        <li>Go back to the suite and click <b>Edit</b> on <b>EX-4</b>.</li>
+        <li>In <b>Expected result</b>, change <code>'Export Customers CSV'</code> to <code>'Export page'</code>, then click <b>Save and check it now</b>.</li>
+        <li>The new run shows EX-4 as ${verdictBadge('Pass')}. This is the normal loop: run, read the finding, then either fix the case (if your wording was off) or report the bug (if the site is wrong).</li>
+      </ol>
+      <p>That new run also shows a <b>Since the previous run</b> box at the top: ✅ <i>No longer failing: EX-4 (was Fail …)</i>. SL QA compares each case with its last result, so you can see at a glance what a fix changed.</p>
+
+      <h3>Step 5: Paste a bug straight from Jira</h3>
+      <p>Most bugs are already written up in Jira. Here is one about the POS page, exactly as a tester wrote it:</p>
+      <pre class="jira">${esc(EXAMPLE_JIRA)}</pre>
+      <ol>
+        <li>In the example suite, click <b>＋ Add case</b>.</li>
+        <li>Copy the text above into <b>Paste a bug report</b> and click <b>Fill the form from it</b>. The page becomes <code>/dashboard/pos</code>, with 5 steps and 2 expected results.</li>
+        <li>Click <b>Add and check it now</b>.</li>
+      </ol>
+      <p>It comes back ${verdictBadge('Fail')} with two findings that read like this:</p>
+      <div class="finding-demo"><ul>
+        <li><b>Expected:</b> Names wrap up to 2 lines and stay readable<br><b>Actual:</b> 12 of 17 names are cut off (limited to 1 line), e.g. 'De'Amira Vacation Lashes - Pre-Glued' …</li>
+        <li><b>Expected:</b> An empty side panel can be collapsed or leaves room for the main content<br><b>Actual:</b> the right panel is 480px wide (33% of a 1440px screen) while empty; no collapse or hide control</li>
+      </ul></div>
+      <p>Nothing was rewritten: the bot read the steps and expected result as the tester wrote them, and measured the page. See <a href="#paste">Paste a bug report from Jira</a> for every kind of step and expected result it understands.</p>
+
+      <h3>Step 6: Now write your own</h3>
+      <p>In the same suite, click <b>＋ Add case</b> and copy this pattern for a page you know:</p>
+      <div class="pattern">
+        <p><b>Title:</b> <span class="fill">What you're checking, in a few words</span></p>
+        <p><b>Page link:</b> <span class="fill">/dashboard/…</span> <span class="sub">(open the page in slshop.cloud and copy the address)</span></p>
+        <p><b>Steps</b> <span class="sub">(optional)</span>: <span class="fill">1. Click 'Some button'</span></p>
+        <p><b>Expected result:</b> <span class="fill">• The 'Exact text on screen' button should be visible.</span></p>
+      </div>
+      <p>Then click <b>Add and check it now</b>. Some good first ideas:</p>
+      <ul>
+        <li><code>/dashboard</code>: <code>• The page should load without errors.</code></li>
+        <li><code>/dashboard/orders</code>: <code>• The page should not show NaN or undefined values.</code></li>
+        <li>Any page with a search box: <code>1. Type 'tuna' in search</code> → <code>• The page should load without errors.</code></li>
+      </ul>
+      <p>If the <b>Understood</b> column shows a <b>?</b>, open <b>How the bot reads it</b> and reword that sentence (see <a href="#writing">Writing sentences the bot understands</a>). When you're comfortable, move your real cases into a Google Sheet and add it as a suite (<a href="#sheet">steps 1–2</a>).</p>
+      <p class="sub">Done with the example? Open the suite, then <b>Suite settings</b> → <b>Delete suite</b>. You can create it again from here at any time.</p>
+    </section>
 
     <section class="glance"><h2>The whole thing in 30 seconds</h2>
       <ol class="flow">
@@ -596,8 +700,8 @@ export function helpPage(): string {
     </section>
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
-      <a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#site"><b>Check the whole dashboard</b></a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
+      <a href="#example"><b>Try it: a worked example</b></a><a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#site"><b>Check the whole dashboard</b></a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -850,87 +954,6 @@ export function helpPage(): string {
       </dl>
     </section>
 
-    <section id="example" class="example"><h2><span class="num">★</span> Try it: a worked example</h2>
-      <p>The quickest way to learn SL QA is to run something small and look at the result. This example has <b>4 cases</b> about real slshop.cloud pages. Three pass, and one <b>fails on purpose</b> so you can see what a problem looks like and how to fix it. It only opens pages and reads them; nothing in the store changes.</p>
-
-      <h3>Step 1: Create the example suite</h3>
-      <form method="post" action="/help/example" class="inline"><button class="primary">＋ Create the example suite</button></form>
-      <span class="sub">Or <a href="/help/example.csv" download>download it as a sheet</a> and add it yourself, as in steps 1–2 above.</span>
-      <p>It holds these 4 cases. Each row is one case: <i>go to this page, do these steps, this should be true</i>.</p>
-      <table class="stack-sm example-cases"><thead><tr><th>ID</th><th>Page</th><th>Steps</th><th>Expected result</th></tr></thead><tbody>
-        ${EXAMPLE_CASES.map((c) => `<tr><td><b>${esc(c.id)}</b><div class="sub">${esc(c.title)}</div></td><td><code>${esc(c.url)}</code></td><td>${c.steps.map((x) => esc(x)).join('<br>')}</td><td>${c.expected.map((x) => `• ${esc(x)}`).join('<br>')}${c.reported ? `<div class="sub">What the tester saw: ${esc(c.reported)}</div>` : ''}</td></tr>`).join('')}
-      </tbody></table>
-      <p class="sub">Notice the <b>'single quotes'</b> around button and title names. That tells the bot exactly what to look for on the page.</p>
-
-      <h3>Step 2: Run it</h3>
-      <ol>
-        <li>On the suite page, all 4 cases are ticked. The <b>Understood</b> column says <span class="ok">✓ all</span> for each, so the bot can read every sentence.</li>
-        <li>Click <b>▶ Run all 4</b>. The run page opens and shows which case is being checked.</li>
-        <li>Wait about <b>1–2 minutes</b> (around 20 seconds per case).</li>
-      </ol>
-
-      <h3>Step 3: Read the result</h3>
-      <p>When it finishes, you should see <span class="count pass">3 Pass</span> <span class="count fail">1 Fail</span>, and the status <b>Finished · issues found</b>.</p>
-      <table class="stack-sm"><thead><tr><th>Case</th><th>Result</th><th>What it means</th></tr></thead><tbody>
-        <tr><td><b>EX-1</b> Orders page</td><td>${verdictBadge('Pass')}</td><td>The title 'Orders' was on the page, and the page loaded with no errors and no failed requests.</td></tr>
-        <tr><td><b>EX-2</b> Products buttons</td><td>${verdictBadge('Pass')}</td><td>Both buttons were found.</td></tr>
-        <tr><td><b>EX-3</b> Filter panel</td><td>${verdictBadge('Pass')}</td><td>The bot clicked <i>Filter</i> (a <b>step</b>), then found the <i>Done</i> button in the panel that opened.</td></tr>
-        <tr><td><b>EX-4</b> Customers export</td><td>${verdictBadge('Fail')}</td><td>There is no button called 'Export Customers CSV' on that page.</td></tr>
-      </tbody></table>
-      <p>Click <b>View report</b>. Under <b>Findings</b>, EX-4 reads like this:</p>
-      <div class="finding-demo">
-        <p><b>EX-4: Customers page has a CSV export button</b></p>
-        <ul>
-          <li><b>Reported by the tester:</b> I could not find a button to export customers as CSV.</li>
-          <li><b>Expected:</b> 'Export Customers CSV' is shown<br>
-            <b>Actual:</b> not on the page (closest on the page: 'Customers', 'Export page', 'Customers List')<br>
-            <b>Likely cause:</b> The text or control the sheet names is missing, renamed or hidden on this page.</li>
-        </ul>
-        <p class="sub">…followed by a screenshot of the page.</p>
-      </div>
-      <p>The useful part is <b>"closest on the page"</b>. The bot didn't just say "missing"; it lists what it <i>did</i> find. Here, <b>'Export page'</b> is the real name of the button. So you now know one of two things: the button was named differently than you thought, or it was renamed and that's the bug to report.</p>
-      <p class="sub">Your numbers may differ slightly if the site has changed since this guide was written. That's what the tool is for.</p>
-
-      <h3>Step 4: Fix the case and run it again</h3>
-      <ol>
-        <li>Go back to the suite and click <b>Edit</b> on <b>EX-4</b>.</li>
-        <li>In <b>Expected result</b>, change <code>'Export Customers CSV'</code> to <code>'Export page'</code>, then click <b>Save and check it now</b>.</li>
-        <li>The new run shows EX-4 as ${verdictBadge('Pass')}. This is the normal loop: run, read the finding, then either fix the case (if your wording was off) or report the bug (if the site is wrong).</li>
-      </ol>
-      <p>That new run also shows a <b>Since the previous run</b> box at the top: ✅ <i>No longer failing: EX-4 (was Fail …)</i>. SL QA compares each case with its last result, so you can see at a glance what a fix changed.</p>
-
-      <h3>Step 5: Paste a bug straight from Jira</h3>
-      <p>Most bugs are already written up in Jira. Here is one about the POS page, exactly as a tester wrote it:</p>
-      <pre class="jira">${esc(EXAMPLE_JIRA)}</pre>
-      <ol>
-        <li>In the example suite, click <b>＋ Add case</b>.</li>
-        <li>Copy the text above into <b>Paste a bug report</b> and click <b>Fill the form from it</b>. The page becomes <code>/dashboard/pos</code>, with 5 steps and 2 expected results.</li>
-        <li>Click <b>Add and check it now</b>.</li>
-      </ol>
-      <p>It comes back ${verdictBadge('Fail')} with two findings that read like this:</p>
-      <div class="finding-demo"><ul>
-        <li><b>Expected:</b> Names wrap up to 2 lines and stay readable<br><b>Actual:</b> 12 of 17 names are cut off (limited to 1 line), e.g. 'De'Amira Vacation Lashes - Pre-Glued' …</li>
-        <li><b>Expected:</b> An empty side panel can be collapsed or leaves room for the main content<br><b>Actual:</b> the right panel is 480px wide (33% of a 1440px screen) while empty; no collapse or hide control</li>
-      </ul></div>
-      <p>Nothing was rewritten: the bot read the steps and expected result as the tester wrote them, and measured the page. See <a href="#paste">Paste a bug report from Jira</a> for every kind of step and expected result it understands.</p>
-
-      <h3>Step 6: Now write your own</h3>
-      <p>In the same suite, click <b>＋ Add case</b> and copy this pattern for a page you know:</p>
-      <div class="pattern">
-        <p><b>Title:</b> <span class="fill">What you're checking, in a few words</span></p>
-        <p><b>Page link:</b> <span class="fill">/dashboard/…</span> <span class="sub">(open the page in slshop.cloud and copy the address)</span></p>
-        <p><b>Steps</b> <span class="sub">(optional)</span>: <span class="fill">1. Click 'Some button'</span></p>
-        <p><b>Expected result:</b> <span class="fill">• The 'Exact text on screen' button should be visible.</span></p>
-      </div>
-      <p>Then click <b>Add and check it now</b>. Some good first ideas:</p>
-      <ul>
-        <li><code>/dashboard</code>: <code>• The page should load without errors.</code></li>
-        <li><code>/dashboard/orders</code>: <code>• The page should not show NaN or undefined values.</code></li>
-        <li>Any page with a search box: <code>1. Type 'tuna' in search</code> → <code>• The page should load without errors.</code></li>
-      </ul>
-      <p>If the <b>Understood</b> column shows a <b>?</b>, open <b>How the bot reads it</b> and reword that sentence (see <a href="#writing">Writing sentences the bot understands</a>). When you're comfortable, move your real cases into a Google Sheet and add it as a suite (<a href="#sheet">steps 1–2</a>).</p>
-      <p class="sub">Done with the example? Open the suite, then <b>Suite settings</b> → <b>Delete suite</b>. You can create it again from here at any time.</p>
-    </section>
     </article>`,
     { section: 'help' },
   );
