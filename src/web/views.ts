@@ -597,7 +597,7 @@ export function helpPage(): string {
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
       <a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#site"><b>Check the whole dashboard</b></a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a><a href="#example"><b>Try it: a worked example</b></a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -678,6 +678,11 @@ export function helpPage(): string {
         <li><b>↻ Re-run failed only</b>: check just the cases that failed or are marked Review.</li>
         <li><b>Fix prompt</b> (under each failed case): text a developer can paste straight into their tools.</li>
       </ul>
+    </section>
+
+    <section id="site"><h2>Check the whole dashboard (no cases to write)</h2>
+      <p>On <a href="/">Suites</a>, <b>🔎 Check the whole dashboard</b> makes a suite with one case per dashboard page (about 140). Each case checks that the page loads without errors, shows no NaN/undefined values and shows its heading, then tries the page's safe controls: the next page of a list, status tabs, the Filter panel and the search box. It never creates, saves, deletes, imports or sends anything, and live AI help is off for these runs.</p>
+      <p>The page list comes from a <b>site map</b> made by a read-only crawler (about 5 minutes; labels only, no store data). It is crawled again when it is over 7 days old, or when you click <b>↻ Re-crawl</b>. The same map lets steps use any page name, such as <code>Open Products › Categories</code> or <code>Go to Settings &gt; Tax</code>.</p>
     </section>
 
     <section id="manage"><h2>Add, edit or delete cases</h2>
