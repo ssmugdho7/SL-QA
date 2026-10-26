@@ -10,7 +10,8 @@ import { FORM_EXPECT_RULES } from './form-expects.js';
 import { ALL_STEP_RULES } from './natural.js';
 import { ACTION_EXPECTS, ACTION_RULES } from './actions.js';
 import { approved, type Kind } from '../ai/translate.js';
-import { CHANGE_CLAIM, liveEnabled, planRemember, prepareAiProduct, recoverStep, understandExpect, understandStep } from '../ai/assist.js';
+import { CHANGE_CLAIM, FALLBACK_CHAIN, PRIMARY_CHAIN, liveEnabled, planRemember, prepareAiProduct, recoverStep, repairTries, understandExpect, understandStep } from '../ai/assist.js';
+import { primaryAvailable } from '../ai/providers.js';
 import { fallbackCheck, fallbackKind } from './fallback.js';
 import { applyFixtures, planFixtures } from './fixtures.js';
 import { expectClauses, stepClauses } from './split.js';
@@ -286,14 +287,23 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
           if (liveEnabled() && !t.noted.get(`__recovered:${clause.text}`)) {
             t.noted.set(`__recovered:${clause.text}`, true);
             // Repair just this action (with the sentence it came from as context), not the whole sentence again.
-            // Up to REPAIR_TRIES corrections, each told what the earlier ones did and how they failed.
+            // Claude gets 1 or 2 corrections (2 for complex actions, see repairTries), then the fallback chain (Gemini →
+            // Grok → …) gets one more. Each try is told what the earlier ones did and how they failed.
             const rest = g.clauses.slice(ci + 1).map((c) => c.text);
             const tried: { lines: string[]; error: string }[] = [];
+            const claudeTries = primaryAvailable() ? repairTries(clause.text, msg, g.clauses.length) : 0;
+            let claudeMade = 0;
             let repaired = false;
-            for (let attempt = 0; attempt < REPAIR_TRIES && !repaired; attempt++) {
-              onStep?.(`Step failed, asking AI${attempt ? ` again (${attempt + 1})` : ''}: ${clause.text}`);
-              const fix = await recoverStep(t, clause.text, msg, { sentence: g.sentence, later: rest, tried });
-              if (!fix?.lines.length) break;
+            for (let attempt = 0; attempt <= claudeTries && !repaired; attempt++) {
+              const fallback = attempt >= claudeTries;
+              onStep?.(`Step failed, asking AI${fallback ? ' (fallback providers)' : attempt ? ` again (${attempt + 1})` : ''}: ${clause.text}`);
+              const fix = await recoverStep(t, clause.text, msg, { sentence: g.sentence, later: rest, tried, chain: fallback ? FALLBACK_CHAIN : PRIMARY_CHAIN });
+              if (!fix?.lines.length) {
+                // Claude unavailable or out of ideas: go straight to the fallback try.
+                if (!fallback) attempt = claudeTries - 1;
+                continue;
+              }
+              if (!fallback) claudeMade++;
               const done: string[] = [];
               let failed = '';
               for (const l of fix.lines) {
@@ -318,8 +328,11 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
               fixes.set(clause.text, fix.lines);
               t.noted.set('__aiFixes', fixes);
               const why = msg.split('(found:')[0].trim();
-              t.steps.push({ text: label, status: 'done', detail: `As written it failed (${why.slice(0, 120)}); the AI did instead: ${done.join(' → ')}${attempt ? ` (try ${attempt + 1})` : ''}`, via: 'ai' });
-              t.note(`"${clause.text}" failed as written; the AI's corrected version worked${attempt ? ` on try ${attempt + 1}` : ''}: ${done.join(' → ')} (${fix.model}).`);
+              // Which provider made the working fix, and whether it was the fallback after Claude.
+              const who = (fix.provider ?? fix.model).replace(/^(?:Google|xAI|Anthropic)\s+/, '').replace(/\s*\(.*$/, '');
+              const by = fallback ? `${who} fallback, ${claudeMade ? `after ${claudeMade} Claude ${claudeMade > 1 ? 'tries' : 'try'}` : 'Claude not available'}` : attempt ? `${who}, try ${attempt + 1}` : '';
+              t.steps.push({ text: label, status: 'done', detail: `As written it failed (${why.slice(0, 120)}); the AI did instead: ${done.join(' → ')}${by ? ` (${by})` : ''}`, via: 'ai' });
+              t.note(`"${clause.text}" failed as written; the AI's corrected version worked${by ? ` (${by})` : ''}: ${done.join(' → ')} (${fix.model}).`);
               // Not a pass for the step as written: a person decides whether the sheet's wording or the app is wrong.
               t.skip(`Step as written: "${clause.text}"`, `${why}. The AI continued with: ${done.join(' → ')}. If the sheet is right, this is a finding (for example a renamed or missing button); otherwise update the step.`);
               await t.snap(clause.text);
@@ -417,9 +430,6 @@ async function runCaseInner(tc: TestCase, session: Session, runDir: string, star
 }
 
 class StepStop extends Error {}
-
-/** Corrections the AI may try for one failing step (each sees the earlier ones and their errors). */
-const REPAIR_TRIES = Math.max(1, Number(process.env.AI_REPAIR_TRIES ?? 2));
 
 /** Logs an AI line the safety guard refused: a skipped step, a note, and a skip check so the case cannot be a plain Pass. */
 function refuse(t: CaseContext, label: string, why: string, via: 'rules' | 'approved' | 'ai'): void {

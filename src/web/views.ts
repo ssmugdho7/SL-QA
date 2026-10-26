@@ -335,7 +335,7 @@ export function rewritesPage(s: Suite, rows: RewriteRow[], unknown: { kind: stri
 
 export function aiKeysPage(rows: ReturnType<typeof import('../engine/ai/providers.js').status>, paid: { used: number; limit: number }, flash?: string): string {
   const row = (r: (typeof rows)[number]) => `<tr>
-    <td><b>${esc(r.provider.name)}</b><div class="sub">${r.provider.tier === 'free' ? 'free' : 'paid'}</div></td>
+    <td><b>${esc(r.provider.name)}</b><div class="sub">${r.provider.tier}</div></td>
     <td><code>${esc(r.provider.keyEnv)}</code>${r.keys > 1 ? `<div class="sub">${r.keys} keys</div>` : ''}</td>
     <td>${r.set ? '<span class="ok">✓ set</span>' : '<span class="sub">not set</span>'}</td>
     <td><code>${esc(r.model)}</code><div class="sub">change with <code>${esc(r.provider.modelEnv)}</code></div></td>
@@ -345,7 +345,7 @@ export function aiKeysPage(rows: ReturnType<typeof import('../engine/ai/provider
     'AI keys',
     `<p class="crumbs"><a href="/">Suites</a> /</p>
     <h1>AI keys</h1>
-    <p class="sub">SL QA asks the AI only when its own rules fall short: a step or expected result it does not understand, or a step that fails on the page (it then suggests a corrected step). Pass and Fail are always decided by the bot's own checks. It tries the <b>free</b> providers first, top to bottom. A provider that fails (bad key, free quota used up, error) is skipped for a while and the next one is tried. <b>Paid</b> providers are used only when every free one failed, and at most <b>${paid.limit}</b> times a day.</p>
+    <p class="sub">SL QA asks the AI only when its own rules fall short: a step or expected result it does not understand, or a step that fails on the page (it then suggests a corrected step). Pass and Fail are always decided by the bot's own checks. It tries <b>Claude</b> (the primary provider) first, then the others top to bottom: Gemini, Grok and the rest. A provider that fails (bad key, quota used up, error) is skipped for a while and the next one is tried. Paid fallbacks are used at most <b>${paid.limit}</b> times a day; Claude is not counted against that limit.</p>
     ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
     <p>Paid calls today: <b>${paid.used} of ${paid.limit}</b> <span class="sub">(change with <code>AI_PAID_DAILY_LIMIT</code>; 0 = never use paid keys)</span></p>
     ${wrap(`<table><thead><tr><th>Provider</th><th>.env name</th><th>Key</th><th>Model</th><th>Today</th><th></th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table>`)}
@@ -875,30 +875,31 @@ export function helpPage(): string {
       <p>The bot has built-in rules for the pages it knows well. For everything else it gets help from an AI, <b>automatically, during the run</b>:</p>
       <ol>
         <li><b>A sentence it doesn't understand:</b> the AI reads it together with the case's title, preconditions, test data and <i>what is on the screen right now</i>, and turns it into simple steps. The bot does them straight away.</li>
-        <li><b>A step that fails on the page</b> (button not found, dialog not open, renamed label): the AI looks at the page (and a screenshot, when the provider can read images) and suggests a corrected step, and the bot tries it, up to 2 times. The report keeps the original problem visible as "not checked", so a renamed button is never hidden.</li>
+        <li><b>A step that fails on the page</b> (button not found, dialog not open, renamed label): the AI looks at the page (and a screenshot, when the provider can read images) and suggests a corrected step, and the bot tries it. Claude gets 1 try for a simple step and 2 for a complex one (inside a row or dialog, a dropdown, an upload, or several matching buttons). If those fail, one more try goes to the fallbacks (Gemini, then Grok). The report keeps the original problem visible as "not checked", so a renamed button is never hidden.</li>
         <li><b>An expected result it doesn't understand:</b> the AI turns it into checks the bot can measure (text shown, button visible, a number next to a label). It opens the tab the check is about first. For "should increase by 5" or "should change", it remembers the value <i>before</i> the steps and compares afterwards.</li>
       </ol>
       <p>In the results, these steps carry an <span class="tag ai">AI</span> badge, and the case says <span class="tag ai">AI helped</span>. Pass and Fail are always decided by the bot's own checks, never by the AI.</p>
       <div class="tip"><b>Make it faster and repeatable.</b> Everything the AI worked out is saved as a suggestion. Open <b>Review rewrites</b> on the suite, check it, and click <b>Approve</b>. From then on the bot uses it directly, with no AI call, and gets the same result every time.</div>
       <p><b>Safety.</b> When AI-driven steps would change a product (price, stock, status, channels), the bot first makes its own test product, <code>BTB &lt;case&gt; AI test item</code>, uses only that, and archives it afterwards. Real products are not touched. The code itself also refuses risky clicks from AI steps (Delete, Archive, Refund, Place order, Log out, Generate, Bulk actions…) unless they are on a <code>BTB</code> test record; refused steps show as skipped. The AI is not used at all when no AI key is set.</p>
-      <p class="sub">Limits per case: at most 12 AI calls for steps and 12 for checks (<code>AI_MAX_CALLS_PER_CASE</code>), and at most 240 seconds of AI time (<code>AI_MAX_SECONDS_PER_CASE</code>). <code>AI_REPAIR_TRIES</code> (default 2) sets the repair tries and <code>AI_VISION=off</code> stops sending screenshots. To switch live help off but keep the review page, set <code>AI_LIVE=off</code>.</p>
+      <p class="sub">Limits per case: at most 12 AI calls for steps and 12 for checks (<code>AI_MAX_CALLS_PER_CASE</code>), and at most 240 seconds of AI time (<code>AI_MAX_SECONDS_PER_CASE</code>). <code>AI_REPAIR_TRIES</code> caps Claude's repair tries (0 = fallback try only) and <code>AI_VISION=off</code> stops sending screenshots. To switch live help off but keep the review page, set <code>AI_LIVE=off</code>.</p>
       <h3>The step language</h3>
       ${ACTION_HELP}
-      <h3 id="ai-keys">AI keys: free first, paid only as a backup</h3>
-      <p>Put the keys in the <code>.env</code> file (next to <code>package.json</code>), then restart SL QA. The <a href="/settings/ai">AI keys</a> page shows which are set and how they are doing. SL QA tries the <b>free</b> providers in this order and moves on when one fails (bad key, free quota used up, server error):</p>
+      <h3 id="ai-keys">AI keys: Claude first, then Gemini and Grok</h3>
+      <p>Put the keys in the <code>.env</code> file (next to <code>package.json</code>), then restart SL QA. The <a href="/settings/ai">AI keys</a> page shows which are set and how they are doing. SL QA tries the providers in this order and moves on when one fails (bad key, quota used up, server error):</p>
       <table class="stack-sm"><thead><tr><th>Order</th><th>.env line</th><th>Where to get it</th><th>Free limits (roughly)</th></tr></thead><tbody>
-        <tr><td>1 · free</td><td><code>GEMINI_API_KEY=…</code></td><td>Google AI Studio → <b>Get API key</b> (aistudio.google.com/apikey)</td><td>~15 requests/min, ~500/day</td></tr>
-        <tr><td>2 · free</td><td><code>GROQ_API_KEY=…</code></td><td>console.groq.com → <b>API Keys</b></td><td>30/min, 1,000/day</td></tr>
-        <tr><td>3 · free</td><td><code>OPENROUTER_API_KEY=…</code></td><td>openrouter.ai → <b>Settings → Keys</b></td><td>20/min, 50/day (only ":free" models are used)</td></tr>
-        <tr><td>4 · free</td><td><code>MISTRAL_API_KEY=…</code></td><td>console.mistral.ai → <b>API Keys</b></td><td>monthly cap, shown in their console</td></tr>
-        <tr><td>5 · paid</td><td><code>ANTHROPIC_API_KEY=…</code></td><td>console.anthropic.com → <b>API Keys</b> (needs billing)</td><td>pay per use</td></tr>
-        <tr><td>6 · paid</td><td><code>OPENAI_API_KEY=…</code></td><td>platform.openai.com → <b>API keys</b> (needs billing)</td><td>pay per use</td></tr>
-        <tr><td>7 · paid</td><td><code>CEREBRAS_API_KEY=…</code></td><td>cloud.cerebras.ai (one-time $5 trial, card needed)</td><td>pay per use</td></tr>
+        <tr><td>1 · primary</td><td><code>ANTHROPIC_API_KEY=…</code></td><td>console.anthropic.com → <b>API Keys</b> (needs billing; Claude Sonnet)</td><td>pay per use, not capped</td></tr>
+        <tr><td>2 · free</td><td><code>GEMINI_API_KEY=…</code></td><td>Google AI Studio → <b>Get API key</b> (aistudio.google.com/apikey)</td><td>~15 requests/min, ~500/day</td></tr>
+        <tr><td>3 · paid</td><td><code>XAI_API_KEY=…</code></td><td>console.x.ai → <b>API Keys</b> (Grok)</td><td>pay per use</td></tr>
+        <tr><td>4 · free</td><td><code>GROQ_API_KEY=…</code></td><td>console.groq.com → <b>API Keys</b></td><td>30/min, 1,000/day</td></tr>
+        <tr><td>5 · free</td><td><code>OPENROUTER_API_KEY=…</code></td><td>openrouter.ai → <b>Settings → Keys</b></td><td>20/min, 50/day (only ":free" models are used)</td></tr>
+        <tr><td>6 · free</td><td><code>MISTRAL_API_KEY=…</code></td><td>console.mistral.ai → <b>API Keys</b></td><td>monthly cap, shown in their console</td></tr>
+        <tr><td>7 · paid</td><td><code>OPENAI_API_KEY=…</code></td><td>platform.openai.com → <b>API keys</b> (needs billing)</td><td>pay per use</td></tr>
+        <tr><td>8 · paid</td><td><code>CEREBRAS_API_KEY=…</code></td><td>cloud.cerebras.ai (one-time $5 trial, card needed)</td><td>pay per use</td></tr>
       </tbody></table>
       <ul>
-        <li><b>You need only one free key to start.</b> Gemini and Groq are the easiest; adding two or three makes it very unlikely all free ones fail at once.</li>
-        <li><b>Paid keys are a backup.</b> They are used only after every free key failed, and at most <code>AI_PAID_DAILY_LIMIT</code> times a day (default 20; set 0 to never use them).</li>
-        <li><b>Change a model:</b> <code>GEMINI_MODEL</code>, <code>GROQ_MODEL</code>, <code>OPENROUTER_MODEL</code>, <code>MISTRAL_MODEL</code>, <code>ANTHROPIC_MODEL</code>, <code>OPENAI_MODEL</code>, <code>CEREBRAS_MODEL</code>.</li>
+        <li><b>Claude is the main AI.</b> Add a Gemini key (free) and a Grok key as fallbacks, so a step still gets help when Claude is down or its fix fails.</li>
+        <li><b>Paid fallbacks are capped.</b> Grok, OpenAI and Cerebras are used at most <code>AI_PAID_DAILY_LIMIT</code> times a day (default 20; set 0 to never use them). Claude is not counted.</li>
+        <li><b>Change a model:</b> <code>GEMINI_MODEL</code>, <code>GROQ_MODEL</code>, <code>OPENROUTER_MODEL</code>, <code>MISTRAL_MODEL</code>, <code>ANTHROPIC_MODEL</code> (default <code>claude-sonnet-5-5</code>), <code>XAI_MODEL</code>, <code>OPENAI_MODEL</code>, <code>CEREBRAS_MODEL</code>.</li>
         <li><b>Several keys for one provider:</b> separate them with commas. Note that Gemini limits are per Google Cloud project, so two keys from the same project don't add more.</li>
       </ul>
       <p class="sub">Without any key, everything else works as before (no AI). The sentences, the case title and the page path are sent to the provider; logins and store data are not. Free tiers may use prompts to improve their models (Google, and Mistral unless you opt out in its Admin → Privacy).</p>

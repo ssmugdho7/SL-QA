@@ -3,14 +3,14 @@ import { pageInfo } from '../pages.js';
 import { ACTION_EXPECTS, ACTION_RULES, remembered } from '../phrases/actions.js';
 import type { ExpectRule } from '../phrases/expects.js';
 import type { StepRule } from '../phrases/steps.js';
-import { visionAvailable } from './providers.js';
+import { visionAvailable, type ChainOptions } from './providers.js';
 import { aiProvider, keyOf, pageKeyOf, pageOf, loadTranslations, saveTranslations, translate, type Kind, type Translation } from './translate.js';
 
 /**
  * Live AI help while a case runs, used only when the rules could not do a step:
  *  - "understand": a sentence no rule reads → the AI rewrites it into the step language and the bot runs it at once;
  *  - "recover": a step that failed on the page → the AI sees what is on screen and suggests a corrected version, which
- *    the bot tries once.
+ *    the bot tries (Claude 1–2 times, see repairTries, then once more with the fallback providers).
  * Every AI decision is labelled in the report and saved as a suggestion, so a person can approve it for next time
  * (approved rewrites then run without the AI). The AI never decides whether a check passed.
  *
@@ -27,7 +27,7 @@ const PER_CASE = Number(process.env.AI_MAX_CALLS_PER_CASE ?? 12);
  */
 const AI_SECONDS = Number(process.env.AI_MAX_SECONDS_PER_CASE ?? Math.min(240, Math.max(30, Number(process.env.CASE_TIMEOUT_SECONDS ?? 600) * 0.4)));
 
-export interface Resolved<T> { lines: { text: string; rule: T }[]; note: string; model: string }
+export interface Resolved<T> { lines: { text: string; rule: T }[]; note: string; model: string; provider?: string }
 
 /** Steps and expected results each have their own allowance, so a hard step cannot use up the checks' share. */
 function budget(t: CaseContext, kind: Kind = 'step'): boolean {
@@ -162,7 +162,7 @@ function mapLines<T>(lines: string[], table: T extends StepRule ? StepRule[] : E
   return lines.map((l) => ({ text: l, rule: (table as { pattern: RegExp }[]).find((r) => r.pattern.test(l)) as T | undefined })).filter((x): x is { text: string; rule: T } => !!x.rule);
 }
 
-async function ask(t: CaseContext, kind: Kind, source: string, extra: string, opts: { save?: boolean; image?: boolean; ask?: string } = {}): Promise<Translation | null> {
+async function ask(t: CaseContext, kind: Kind, source: string, extra: string, opts: { save?: boolean; image?: boolean; ask?: string; chain?: ChainOptions } = {}): Promise<Translation | null> {
   if (!liveEnabled() || !budget(t, kind)) return null;
   const tc = t.tc;
   const started = Date.now();
@@ -176,6 +176,7 @@ async function ask(t: CaseContext, kind: Kind, source: string, extra: string, op
       testData: tc.testData,
       image: opts.image === false ? undefined : await screenshot(t),
       ask: opts.ask,
+      chain: opts.chain,
     });
     // Only lines this kind can run are kept (a step answer sometimes adds EXPECT lines, which steps never run).
     const usable = (l: string) => ACTION_RULES.some((r) => r.pattern.test(l)) || (kind === 'expect' && ACTION_EXPECTS.some((r) => r.pattern.test(l)));
@@ -239,17 +240,33 @@ export async function understandStep(t: CaseContext, sentence: string): Promise<
  * A step that failed on the page → corrected lines to try, or null. `tried` holds earlier corrections for the same
  * action and how each failed, so the next try does not repeat them.
  */
-export async function recoverStep(t: CaseContext, action: string, error: string, ctx: { sentence: string; later: string[]; tried?: { lines: string[]; error: string }[] }): Promise<Resolved<StepRule> | null> {
+export async function recoverStep(t: CaseContext, action: string, error: string, ctx: { sentence: string; later: string[]; tried?: { lines: string[]; error: string }[]; chain?: ChainOptions }): Promise<Resolved<StepRule> | null> {
   const before = (ctx.tried ?? []).map((x, i) => `\nCorrection ${i + 1} you gave: ${x.lines.join(' → ')}\nIt also FAILED: ${x.error.slice(0, 300)}`).join('');
   const tr = await ask(t, 'step', action, `This action comes from the test step "${ctx.sentence}".
 The robot tried it and it FAILED: ${error.slice(0, 400)}${before}${before ? '\nDo NOT repeat a correction that failed; try a different way, or return no lines if it cannot work.' : ''}
 (When the error lists what was found, pick the closest real choice from that list; test data from the sheet may not exist in this store, e.g. a variant '80g' or a second warehouse. If nothing fits, return no lines and say what is missing.)
 Rewrite ONLY this one action so it works on the page as it is now, using the names actually shown below. If it needs something first (open a dialog, switch a tab, open a section), include that. Do not repeat earlier actions${ctx.later.length ? ` and do not include the actions that come after it (${ctx.later.join(' · ')})` : ''}.
-What is on the page now:\n${await pageSummary(t)}${await productHint(t)}${namesHint(t)}`, { save: false });
+What is on the page now:\n${await pageSummary(t)}${await productHint(t)}${namesHint(t)}`, { save: false, chain: ctx.chain });
   if (!tr) return null;
   // Not stored as the sentence's general rewrite: it is specific to this failure.
-  return { lines: mapLines<StepRule>(tr.lines, ACTION_RULES as never), note: tr.note, model: tr.model };
+  return { lines: mapLines<StepRule>(tr.lines, ACTION_RULES as never), note: tr.note, model: tr.model, provider: tr.provider };
 }
+
+/**
+ * How many corrections Claude gets for a failed action: 2 when it is complex (its sentence has several clauses, it
+ * works inside a section/dialog, selects or uploads, or the error lists several found elements), else 1.
+ * AI_REPAIR_TRIES, when set, caps it (0 = fallback try only).
+ */
+export function repairTries(action: string, error = '', clauses = 1): number {
+  const complex = clauses > 1 || /\bIN\s+'|\bdialog\b|^\s*(?:SELECT|UPLOAD)\b/i.test(action) || /resolved to|found:/i.test(error);
+  const cap = Number(process.env.AI_REPAIR_TRIES);
+  return Math.min(complex ? 2 : 1, process.env.AI_REPAIR_TRIES?.trim() && cap >= 0 ? cap : 2);
+}
+
+/** The fallback chain for the last repair try: every provider except Claude. */
+export const FALLBACK_CHAIN: ChainOptions = { exclude: ['anthropic'] };
+/** Claude only, for the first repair tries. */
+export const PRIMARY_CHAIN: ChainOptions = { only: ['anthropic'] };
 
 /** "Remembered values: stock = 13 (On Hand), n = 57 (list count)" for the AI, so before/after checks use them. */
 function namesHint(t: CaseContext): string {

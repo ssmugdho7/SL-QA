@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { config } from '../config.js';
-import { complete, configured, paidDailyLimit, usage } from './providers.js';
+import { complete, configured, paidDailyLimit, usage, type ChainOptions } from './providers.js';
 
 /**
  * Optional AI translator. It only rewrites a sentence the rule engine did not understand into the fixed action
@@ -24,6 +24,8 @@ export interface Translation {
   /** The page the case was about, given to the AI as context. */
   page: string;
   model: string;
+  /** Name of the provider that answered. */
+  provider?: string;
   createdAt: string;
   reviewedAt?: string;
 }
@@ -81,12 +83,11 @@ export function setStatus(key: string, status: Translation['status'], lines?: st
   return all[key];
 }
 
-/** The first provider that will be tried, for display; null when no key is set (SL QA then stays zero-AI). */
+/** The first provider that will be tried (the primary one when set), for display; null when no key is set (SL QA then stays zero-AI). */
 export function aiProvider(): { name: string; model: string; chain: string[]; paidLimit: number; paidUsed: number } | null {
   const list = configured();
   if (!list.length) return null;
-  const free = list.filter((x) => x.provider.tier === 'free');
-  const first = free[0] ?? list[0];
+  const first = list.find((x) => x.provider.tier === 'primary') ?? list.find((x) => x.provider.tier === 'free') ?? list[0];
   const u = usage();
   return {
     name: first.provider.name,
@@ -156,7 +157,7 @@ Rules:
 - Reply with JSON only: {"lines": ["..."], "note": "..."}`;
 
 /** Asks the AI to translate one sentence. Returns null when no key is set. */
-export async function translate(kind: Kind, source: string, ctx: { page: string; title: string; steps: string[]; expected: string[]; preconditions?: string; testData?: string; /** Base64 JPEG of the page, for providers that read images. */ image?: string; /** Replaces the closing "Translate this … sentence" request. */ ask?: string }): Promise<Translation | null> {
+export async function translate(kind: Kind, source: string, ctx: { page: string; title: string; steps: string[]; expected: string[]; preconditions?: string; testData?: string; /** Base64 JPEG of the page, for providers that read images. */ image?: string; /** Replaces the closing "Translate this … sentence" request. */ ask?: string; /** Narrows the provider chain. */ chain?: ChainOptions }): Promise<Translation | null> {
   if (!aiProvider()) return null;
   const user = `Page: ${ctx.page || '(unknown)'}
 Case title: ${ctx.title}${ctx.preconditions ? `\nPreconditions: ${ctx.preconditions}` : ''}${ctx.testData ? `\nTest data: ${ctx.testData}` : ''}
@@ -174,7 +175,7 @@ ${ctx.ask ?? `Translate this ${kind === 'step' ? 'STEP' : 'EXPECTED RESULT'} sen
     if (!Array.isArray(parsed.lines)) throw new Error('no lines');
     return parsed;
   };
-  const { value, provider: used, model } = await complete(GUIDE, user, parse, ctx.image);
+  const { value, provider: used, model } = await complete(GUIDE, user, parse, ctx.image, ctx.chain);
   const lines = (value.lines as unknown[]).map(String).map((l) => l.trim()).filter(Boolean).slice(0, 12);
-  return { source, kind, lines, note: String(value.note ?? ''), status: 'suggested', page: ctx.page, model: `${used.name} · ${model}`, createdAt: new Date().toISOString() };
+  return { source, kind, lines, note: String(value.note ?? ''), status: 'suggested', page: ctx.page, model: `${used.name} · ${model}`, provider: used.name, createdAt: new Date().toISOString() };
 }

@@ -3,8 +3,9 @@ import path from 'path';
 import { config } from '../config.js';
 
 /**
- * AI providers, tried in order: every FREE provider that has a key first, then PAID ones, but paid calls are
- * capped per day (AI_PAID_DAILY_LIMIT, default 20) so a broken free key can never run up a bill.
+ * AI providers, tried in the order of PROVIDERS: Claude (the PRIMARY provider) first, then Gemini, Grok and the rest.
+ * PAID fallbacks are capped per day (AI_PAID_DAILY_LIMIT, default 20) so a broken key can never run up a bill; the
+ * primary provider is not counted against that cap.
  * A provider that fails (bad key, quota used up, server error, unreadable answer) is skipped for a while and the
  * next one is tried. Usage is counted in data/ai-usage.json.
  *
@@ -14,9 +15,11 @@ import { config } from '../config.js';
 export interface Provider {
   id: string;
   name: string;
-  tier: 'free' | 'paid';
+  tier: 'primary' | 'free' | 'paid';
   /** .env variable holding the key. */
   keyEnv: string;
+  /** Other .env names accepted for the key. */
+  keyAliases?: string[];
   /** .env variable that overrides the model. */
   modelEnv: string;
   defaultModel: string;
@@ -35,12 +38,22 @@ export interface Provider {
 }
 
 export const PROVIDERS: Provider[] = [
-  // ── Free (tried first, in this order). Checked against each provider's docs on 2026-10-21. ──
+  // ── Primary (tried first for every call; not capped by AI_PAID_DAILY_LIMIT) ──
+  {
+    id: 'anthropic', name: 'Anthropic Claude (primary)', tier: 'primary', keyEnv: 'ANTHROPIC_API_KEY', modelEnv: 'ANTHROPIC_MODEL', defaultModel: 'claude-sonnet-5-5',
+    api: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', signup: 'https://console.anthropic.com/settings/keys', jsonMode: false, vision: true,
+  },
+  // ── Fallbacks, in this order. Free tiers checked against each provider's docs on 2026-10-21. ──
   {
     // Free tier: about 15 requests/min and ~500/day on Flash-Lite (Google shows exact numbers per project in AI Studio).
     // Note: Google may use free-tier prompts to improve its products.
     id: 'gemini', name: 'Google Gemini (free tier)', tier: 'free', keyEnv: 'GEMINI_API_KEY', modelEnv: 'GEMINI_MODEL', defaultModel: 'gemini-3.5-flash-lite',
     api: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', signup: 'https://aistudio.google.com/apikey', jsonMode: true, vision: true,
+  },
+  {
+    // Pay per use; counted against AI_PAID_DAILY_LIMIT. GROK_API_KEY is accepted as well.
+    id: 'xai', name: 'xAI Grok (paid)', tier: 'paid', keyEnv: 'XAI_API_KEY', keyAliases: ['GROK_API_KEY'], modelEnv: 'XAI_MODEL', defaultModel: 'grok-4.5',
+    api: 'openai', baseUrl: 'https://api.x.ai/v1', signup: 'https://console.x.ai', jsonMode: true, vision: true,
   },
   {
     // Free plan: 30 requests/min, 1,000/day, 8K tokens/min. Does not keep prompts by default.
@@ -60,11 +73,7 @@ export const PROVIDERS: Provider[] = [
     api: 'openai', baseUrl: 'https://api.mistral.ai/v1', signup: 'https://console.mistral.ai/api-keys', jsonMode: true, vision: false,
     extraBody: { reasoning_effort: 'none' },
   },
-  // ── Paid (only when every free one failed; capped per day by AI_PAID_DAILY_LIMIT) ──
-  {
-    id: 'anthropic', name: 'Anthropic Claude (paid)', tier: 'paid', keyEnv: 'ANTHROPIC_API_KEY', modelEnv: 'ANTHROPIC_MODEL', defaultModel: 'claude-haiku-5-5',
-    api: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', signup: 'https://console.anthropic.com/settings/keys', jsonMode: false, vision: true,
-  },
+  // ── Paid (capped per day by AI_PAID_DAILY_LIMIT) ──
   {
     id: 'openai', name: 'OpenAI (paid)', tier: 'paid', keyEnv: 'OPENAI_API_KEY', modelEnv: 'OPENAI_MODEL', defaultModel: 'gpt-4.1-mini',
     api: 'openai', baseUrl: 'https://api.openai.com/v1', signup: 'https://platform.openai.com/api-keys', jsonMode: true, vision: true,
@@ -77,7 +86,7 @@ export const PROVIDERS: Provider[] = [
 ];
 
 /** A key may hold several keys separated by commas (e.g. two free Gemini projects); each is tried in turn. */
-const keysOf = (p: Provider) => (process.env[p.keyEnv] ?? '').split(',').map((k) => k.trim()).filter(Boolean);
+const keysOf = (p: Provider) => [p.keyEnv, ...(p.keyAliases ?? [])].map((k) => process.env[k] ?? '').join(',').split(',').map((k) => k.trim()).filter(Boolean);
 /** On OpenRouter only ":free" model IDs cost nothing; a paid ID there would quietly bill the account. */
 const safeModel = (p: Provider, m: string) => (p.id === 'openrouter' && !/:free$|^openrouter\/free$/.test(m) ? p.defaultModel : m);
 const modelOf = (p: Provider) => safeModel(p, process.env[p.modelEnv]?.trim() || p.defaultModel);
@@ -85,6 +94,9 @@ export const paidDailyLimit = () => Math.max(0, Number(process.env.AI_PAID_DAILY
 
 /** True when a provider that reads screenshots has a key (and AI_VISION is not off). */
 export const visionAvailable = () => !/^(off|0|false|no)$/i.test(process.env.AI_VISION ?? '') && PROVIDERS.some((p) => p.vision && keysOf(p).length);
+
+/** True when the primary provider (Claude) has a key. */
+export const primaryAvailable = () => PROVIDERS.some((p) => p.tier === 'primary' && keysOf(p).length);
 
 export function configured(): { provider: Provider; keys: number; model: string }[] {
   return PROVIDERS.filter((p) => keysOf(p).length).map((p) => ({ provider: p, keys: keysOf(p).length, model: modelOf(p) }));
@@ -149,15 +161,19 @@ async function pace(p: Provider): Promise<void> {
   lastCall.set(p.id, Date.now());
 }
 
+/** Narrows the chain for one call: `only` = just these provider ids, `exclude` = all but these (e.g. a fallback try without Claude). */
+export interface ChainOptions { only?: string[]; exclude?: string[] }
+
 /**
- * Sends one request through the chain: free providers first, then paid ones (within the daily cap).
+ * Sends one request through the chain in PROVIDERS order (paid fallbacks within the daily cap).
  * `parse` validates the answer; an answer that does not parse counts as a failure and the next provider is tried.
  */
-export async function complete<T>(system: string, user: string, parse: (text: string) => T, image?: string): Promise<{ value: T; provider: Provider; model: string; attempts: Attempt[] }> {
+export async function complete<T>(system: string, user: string, parse: (text: string) => T, image?: string, opts: ChainOptions = {}): Promise<{ value: T; provider: Provider; model: string; attempts: Attempt[] }> {
   const u = usage();
   const attempts: Attempt[] = [];
-  const chain = [...PROVIDERS.filter((p) => p.tier === 'free'), ...PROVIDERS.filter((p) => p.tier === 'paid')];
-  if (!configured().length) throw new AiError('No AI key is set. Add a free key (GEMINI_API_KEY, GROQ_API_KEY, …) to .env and restart.', 'none');
+  const chain = PROVIDERS.filter((p) => (!opts.only || opts.only.includes(p.id)) && !opts.exclude?.includes(p.id));
+  if (!configured().length) throw new AiError('No AI key is set. Add ANTHROPIC_API_KEY (or a free key such as GEMINI_API_KEY) to .env and restart.', 'none');
+  if (!chain.some((p) => keysOf(p).length)) throw new AiError(`No AI key is set for ${opts.only ? opts.only.join(', ') : 'the fallback providers'}.`, 'none');
 
   for (const p of chain) {
     const keys = keysOf(p);
@@ -217,7 +233,7 @@ function classify(status: number, message: string): AiError['kind'] {
 }
 
 /** Free tiers sometimes queue a request for minutes; give up quickly and use the next provider instead. */
-const TIMEOUT_MS = { free: 20_000, paid: 45_000 };
+const TIMEOUT_MS = { primary: 45_000, free: 20_000, paid: 45_000 };
 
 async function post(url: string, headers: Record<string, string>, body: unknown, timeoutMs = TIMEOUT_MS.paid): Promise<{ status: number; json: any }> {
   const ctl = new AbortController();
