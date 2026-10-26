@@ -16,7 +16,8 @@ export interface Session {
 interface Auth { token: string; storeId: number }
 
 export async function startSession(headed = false): Promise<Session> {
-  const browser = await chromium.launch({ headless: !headed });
+  // Small containers (e.g. Render's free 512 MB plan) have a tiny /dev/shm; these flags keep Chromium within it.
+  const browser = await chromium.launch({ headless: !headed, args: ['--disable-dev-shm-usage', '--disable-gpu'] });
   let auth = readAuth();
   if (!auth || !(await tokenWorks(auth))) {
     await login(browser);

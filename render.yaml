@@ -1,0 +1,28 @@
+# Render Blueprint: New → Blueprint → pick this repo.
+# Free plan: 512 MB RAM, sleeps after 15 min idle, and no disk, so suites, runs
+# and the saved login reset on every redeploy or restart.
+services:
+  - type: web
+    name: sl-qa
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: main
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: "4100"
+      - key: BASE_URL
+        value: https://slshop.cloud
+      - key: API_URL
+        value: https://api.slshop.cloud/api/v1
+      - key: LOGIN_PHONE
+        sync: false
+      - key: LOGIN_PASSWORD
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

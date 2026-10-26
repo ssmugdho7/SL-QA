@@ -1,0 +1,13 @@
+services:
+  sl-qa:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    expose:
+      - "4100"
+    volumes:
+      - sl-qa-storage:/storage
+    shm_size: "1gb"
+
+volumes:
+  sl-qa-storage:
