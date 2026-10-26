@@ -11,6 +11,7 @@ import { EXAMPLE_CASES, EXAMPLE_SUITE_NAME, exampleCsv } from './example.js';
 import { cancel, crawlState, enqueue, recover, startCrawl, syncSiteSuite } from './runner.js';
 import { loadSiteMap, siteCases, siteMapAge } from '../engine/apps/slshop/crawl.js';
 import { knownPages } from '../engine/pages.js';
+import { handleChat } from './chat.js';
 import { newId, runs, suites, uploadsDir, type Run, type Suite } from './store.js';
 import { aiKeysPage, examplePage, helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow, type SiteInfo } from './views.js';
 import { previewCase } from '../engine/phrases/index.js';
@@ -119,6 +120,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const p = url.pathname;
   const post = req.method === 'POST';
   let m: RegExpMatchArray | null;
+
+  if (p === '/chat' || p.startsWith('/chat/')) {
+    if (await handleChat(req, res, p, { send: (status, html) => send(res, status, html), redirect: (to) => redirect(res, to), form: () => parseForm(req) })) return;
+  }
 
   if (p === '/' && !post) return send(res, 200, homePage(suites.all(), lastRunBySuite(), undefined, undefined, siteInfo(url.searchParams.get('msg') ?? undefined)));
 

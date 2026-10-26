@@ -161,8 +161,8 @@ async function pace(p: Provider): Promise<void> {
   lastCall.set(p.id, Date.now());
 }
 
-/** Narrows the chain for one call: `only` = just these provider ids, `exclude` = all but these (e.g. a fallback try without Claude). */
-export interface ChainOptions { only?: string[]; exclude?: string[] }
+/** Narrows the chain for one call: `only` = just these provider ids, `exclude` = all but these (e.g. a fallback try without Claude). `maxTokens` = longer answers (default 700). */
+export interface ChainOptions { only?: string[]; exclude?: string[]; maxTokens?: number }
 
 /**
  * Sends one request through the chain in PROVIDERS order (paid fallbacks within the daily cap).
@@ -195,7 +195,7 @@ export async function complete<T>(system: string, user: string, parse: (text: st
         // A screenshot (base64 JPEG) goes only to providers that read images; the others get the text alone.
         const img = p.vision ? image : undefined;
         const said = img ? `${user}\n(A screenshot of the page as it is now is attached.)` : user;
-        const text = p.api === 'anthropic' ? await callAnthropic(p, key, model, system, said, img) : await callOpenAICompatible(p, key, model, system, said, img);
+        const text = p.api === 'anthropic' ? await callAnthropic(p, key, model, system, said, img, opts.maxTokens) : await callOpenAICompatible(p, key, model, system, said, img, opts.maxTokens);
         let value: T;
         try {
           value = parse(text);
@@ -234,6 +234,8 @@ function classify(status: number, message: string): AiError['kind'] {
 
 /** Free tiers sometimes queue a request for minutes; give up quickly and use the next provider instead. */
 const TIMEOUT_MS = { primary: 45_000, free: 20_000, paid: 45_000 };
+/** Long answers (chat) take longer to write: double the wait for them. */
+const timeoutFor = (p: Provider, maxTokens: number) => TIMEOUT_MS[p.tier] * (maxTokens > 700 ? 2 : 1);
 
 async function post(url: string, headers: Record<string, string>, body: unknown, timeoutMs = TIMEOUT_MS.paid): Promise<{ status: number; json: any }> {
   const ctl = new AbortController();
@@ -250,12 +252,12 @@ async function post(url: string, headers: Record<string, string>, body: unknown,
   }
 }
 
-async function callOpenAICompatible(p: Provider, key: string, model: string, system: string, user: string, image?: string): Promise<string> {
+async function callOpenAICompatible(p: Provider, key: string, model: string, system: string, user: string, image?: string, maxTokens = 700): Promise<string> {
   const content = image ? [{ type: 'text', text: user }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image}` } }] : user;
-  const body: Record<string, unknown> = { model, temperature: 0, max_tokens: 700, messages: [{ role: 'system', content: system }, { role: 'user', content }] };
+  const body: Record<string, unknown> = { model, temperature: 0, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content }] };
   if (p.jsonMode) body.response_format = { type: 'json_object' };
   Object.assign(body, p.extraBody ?? {});
-  const { status, json } = await post(`${p.baseUrl}/chat/completions`, { authorization: `Bearer ${key}`, ...(p.extraHeaders ?? {}) }, body, TIMEOUT_MS[p.tier]);
+  const { status, json } = await post(`${p.baseUrl}/chat/completions`, { authorization: `Bearer ${key}`, ...(p.extraHeaders ?? {}) }, body, timeoutFor(p, maxTokens));
   const err = Array.isArray(json) ? json[0]?.error : json?.error;
   const msg = String(err?.message ?? json?.message ?? '');
   if (status >= 300) throw new AiError(`${p.name} ${status}: ${msg || 'request failed'}`, classify(status, msg));
@@ -264,9 +266,9 @@ async function callOpenAICompatible(p: Provider, key: string, model: string, sys
   return text;
 }
 
-async function callAnthropic(p: Provider, key: string, model: string, system: string, user: string, image?: string): Promise<string> {
+async function callAnthropic(p: Provider, key: string, model: string, system: string, user: string, image?: string, maxTokens = 700): Promise<string> {
   const content = image ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } }, { type: 'text', text: user }] : user;
-  const { status, json } = await post(`${p.baseUrl}/messages`, { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, { model, max_tokens: 700, temperature: 0, system, messages: [{ role: 'user', content }] }, TIMEOUT_MS[p.tier]);
+  const { status, json } = await post(`${p.baseUrl}/messages`, { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, { model, max_tokens: maxTokens, temperature: 0, system, messages: [{ role: 'user', content }] }, timeoutFor(p, maxTokens));
   const msg = String(json?.error?.message ?? '');
   if (status >= 300) throw new AiError(`${p.name} ${status}: ${msg || 'request failed'}`, classify(status, msg));
   const text = (json?.content ?? []).filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text).join('');

@@ -21,12 +21,12 @@ const duration = (a?: string, b?: string) => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-type Section = 'suites' | 'runs' | 'help' | 'ai';
+type Section = 'suites' | 'runs' | 'chat' | 'help' | 'ai';
 
 const FAVICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#d6243a"/><path d="M9 16.5l4.5 4.5L23 11.5" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>')}`;
 
 export function layout(title: string, body: string, opts: { refresh?: boolean; section?: Section } = {}): string {
-  const nav = ([['suites', '/', 'Suites'], ['runs', '/runs', 'Runs'], ['ai', '/settings/ai', 'AI keys'], ['help', '/help', 'How to use']] as const)
+  const nav = ([['suites', '/', 'Suites'], ['runs', '/runs', 'Runs'], ['chat', '/chat', 'Assistant'], ['ai', '/settings/ai', 'AI keys'], ['help', '/help', 'How to use']] as const)
     .map(([key, href, label]) => `<a href="${href}"${opts.section === key ? ' aria-current="page"' : ''}>${label}</a>`)
     .join('');
   return `<!doctype html>
@@ -123,6 +123,14 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
     `<div class="page-head"><div><h1>Test suites</h1><p class="sub">A suite is one list of cases (test cases or bugs) for the bot to check on slshop.cloud.</p></div>
       <div class="toolbar"><a class="button" href="#site">🔎 Check the whole dashboard</a><a class="button primary" href="#add">＋ New suite</a></div></div>
     ${site ? siteCard(site) : ''}
+    <section class="card" id="assistant">
+      <h2>💬 Ask the Assistant</h2>
+      <p class="hint">Questions about a dashboard page, or test cases written for you (saved as a suite in one click). It answers from the site map, your suites and, if you give it, the app's GitHub repo.</p>
+      <form method="post" action="/chat" class="toolbar">
+        <input name="message" required maxlength="4000" placeholder="Generate test cases for the POS page" aria-label="Message for the Assistant" style="flex:1;min-width:220px">
+        <button class="primary">Ask</button><a class="button" href="/chat">Open chats</a>
+      </form>
+    </section>
     ${all.length ? wrap(`<table><thead><tr><th>Suite</th><th class="num">Cases</th><th>Understood by the bot</th><th>Last run</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)
       : `<div class="empty"><b>No suites yet.</b><br>Add your first list of cases below: a Google Sheet, a file, or type them in by hand.<br><a href="/help">New here? Read How to use</a> · <a href="/example">Try the example suite</a> · <a href="/help/sample.csv">Download a sample sheet</a></div>`}
     <details class="card" id="add"${error || typed ? ' open' : ''}>
@@ -701,7 +709,7 @@ export function helpPage(): string {
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
       <a href="#example"><b>Try it: a worked example</b></a><a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#site"><b>Check the whole dashboard</b></a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#site"><b>Check the whole dashboard</b></a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#assistant"><b>The Assistant</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -917,6 +925,16 @@ export function helpPage(): string {
         <tr><td><code>A logged-out user should be redirected to the login page.</code></td><td><code>Login is required</code></td></tr>
       </tbody></table>
       <p>For "should not" points, quote the text: <code>The 'Delete' button should not be shown.</code></p>
+    </section>
+
+    <section id="assistant"><h2>The Assistant</h2>
+      <p><a href="/chat">Assistant</a> is a chat about the slshop.cloud dashboard. It answers from what SL QA already knows: the crawled site map (pages, tabs, buttons, fields, columns) and the titles of your suites' cases. When the answer isn't there, it says so instead of guessing. It needs an AI key (see <a href="/settings/ai">AI keys</a>).</p>
+      <ul>
+        <li><b>Ask about a page:</b> <i>What can I filter on the Orders page?</i></li>
+        <li><b>Get test cases:</b> <i>Generate test cases for the POS page.</i> The answer includes a table with the sheet's columns (TC ID, URL, Test Case, Priority, Preconditions, Test Steps, Test Data, Expected Result). Click <b>Save as new suite</b> to add them as a suite, or <b>Download CSV</b> to put them in a sheet. Check <b>How the bot reads it</b> before running them.</li>
+        <li><b>Code context:</b> paste a GitHub link (<code>https://github.com/owner/repo</code>, or <code>…/tree/&lt;branch&gt;/&lt;folder&gt;</code>) and it also reads the most relevant source files: routes, pages, components, validation, tests. The files it used are listed under the answer. A private repo, or many questions an hour, needs <code>GITHUB_TOKEN</code> in <code>.env</code>. Only github.com links are accepted.</li>
+      </ul>
+      <p class="sub">The Assistant never runs anything and never sees your login or keys. Chats are kept under <code>data/chats/</code>; delete them from the chat list.</p>
     </section>
 
     <section id="faq"><h2>Questions and problems</h2>

@@ -22,6 +22,30 @@ export interface Suite {
   createdAt: string;
 }
 
+/** One message in an Assistant chat. `cases` = test cases the AI proposed; `files` = repo files it was given. */
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  at: string;
+  cases?: TestCase[];
+  files?: string[];
+  /** Repo the answer used ("owner/repo@branch"), or the reason it could not be read. */
+  repo?: string;
+  repoError?: string;
+  model?: string;
+  error?: boolean;
+}
+
+export interface Chat {
+  id: string;
+  title: string;
+  /** GitHub URL given as code context (kept for the next question). */
+  repoUrl?: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type RunStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 
 export interface Run {
@@ -81,6 +105,15 @@ export const runs = {
     if (/^[\w-]+$/.test(id)) fs.rmSync(path.join(config.runsDir, id), { recursive: true, force: true });
   },
   forSuite: (suiteId: string) => runs.all().filter((r) => r.suiteId === suiteId),
+};
+
+export const chats = {
+  all: () => readAll<Chat>('chats').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+  get: (id: string) => read<Chat>('chats', id),
+  save: (c: Chat) => write('chats', c.id, c),
+  remove: (id: string) => {
+    if (/^[\w-]+$/.test(id)) fs.rmSync(path.join(dir('chats'), `${id}.json`), { force: true });
+  },
 };
 
 export const uploadsDir = () => dir('uploads');
