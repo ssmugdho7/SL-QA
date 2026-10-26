@@ -112,6 +112,8 @@ async function loadCases(source: Suite['source'], upload?: { name: string; data:
 }
 
 async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  // Health check for hosts like Render; stays open even when APP_PASSWORD is set.
+  if (req.url === '/healthz') return void res.end('ok');
   if (!authorized(req, res)) return;
   const url = new URL(req.url ?? '/', 'http://local');
   const p = url.pathname;
