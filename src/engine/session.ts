@@ -58,7 +58,7 @@ async function login(browser: Browser): Promise<void> {
   await page.getByText('Phone', { exact: true }).click();
   await page.locator('input[name=identifier]').fill(config.phone);
   await page.locator('input[name=password]').fill(config.password);
-  await page.getByRole('button', { name: 'Sign In' }).click();
+  await page.getByRole('button', { name: 'Sign In', exact: true }).click();
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30_000 });
   await page.waitForLoadState('networkidle');
   fs.mkdirSync(path.dirname(config.authFile), { recursive: true });
