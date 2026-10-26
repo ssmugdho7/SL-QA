@@ -10,4 +10,4 @@ COPY src ./src
 # Render free has no disk, so /storage is just a folder there; elsewhere mount a volume on it.
 RUN mkdir -p /storage && ln -s /storage/data data && ln -s /storage/runs runs && ln -s /storage/.auth .auth
 EXPOSE 4100
-CMD ["sh", "-c", "mkdir -p /storage/data /storage/runs /storage/.auth && exec npx tsx src/web/server.ts"]
+CMD ["sh", "-c", "mkdir -p /storage/data /storage/runs /storage/.auth && exec node --import tsx src/web/server.ts"]

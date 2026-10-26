@@ -113,7 +113,7 @@ async function loadCases(source: Suite['source'], upload?: { name: string; data:
 
 async function handle(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // Health check for hosts like Render; stays open even when APP_PASSWORD is set.
-  if (req.url === '/healthz') return void res.end('ok');
+  if (req.url?.split('?')[0] === '/healthz') return void res.end('ok');
   if (!authorized(req, res)) return;
   const url = new URL(req.url ?? '/', 'http://local');
   const p = url.pathname;
@@ -503,4 +503,5 @@ http
       if (!res.headersSent) send(res, 500, layout('Error', `<h1>Something went wrong</h1><pre>${String((e as Error).message)}</pre>`));
     });
   })
-  .listen(config.port, () => console.log(`SL QA running on http://localhost:${config.port}${config.appPassword ? ' (password protected)' : ''}`));
+  // Bind IPv4 explicitly: hosts like Render scan 0.0.0.0 for the open port.
+  .listen(config.port, '0.0.0.0', () => console.log(`SL QA running on http://localhost:${config.port}${config.appPassword ? ' (password protected)' : ''}`));
