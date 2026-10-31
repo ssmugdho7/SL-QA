@@ -3,6 +3,7 @@ import { Marked, type Tokens } from 'marked';
 import { answer, casesCsv, MAX_MESSAGE } from '../engine/ai/chat.js';
 import { parseRepoUrl, RepoError } from '../engine/ai/repo.js';
 import { configured } from '../engine/ai/providers.js';
+import { superQa, superQaMissing } from '../engine/ai/superqa.js';
 import { chats, newId, suites, type Chat, type ChatMessage } from './store.js';
 import { esc, layout, notFound } from './views.js';
 import { knownPages } from '../engine/pages.js';
@@ -10,8 +11,11 @@ import type { TestCase } from '../engine/sources/cases.js';
 
 /**
  * The Assistant pages: /chat (new chat + recent chats), /chat/<id> (one conversation), and the actions on a
- * proposed set of test cases (save as a suite, download CSV). Plain forms; a small script adds Enter-to-send.
+ * proposed set of test cases (save as a suite, download CSV, Super QA). Plain forms; a small script adds Enter-to-send.
  */
+
+/** Only one Super QA at a time (each one opens a browser and takes up to a minute and a half). */
+let superQaBusy = false;
 
 // ── Markdown from the AI: no raw HTML, only http(s), mailto and relative links ──
 
@@ -49,6 +53,10 @@ function casesTable(chat: Chat, i: number, m: ChatMessage): string {
       <button class="primary">Save as new suite</button>
       <a class="button" href="/chat/${chat.id}/cases/${i}.csv" download>⬇ Download CSV</a>
     </form>
+    <form method="post" action="/chat/${chat.id}/cases/${i}/superqa" class="toolbar superqa-form" onsubmit="const b=this.querySelector('button');b.disabled=true;this.querySelector('.sub').hidden=false">
+      <button title="Opens the cases' pages in a logged-in browser and asks a stronger model to correct the cases">🔎 Use Super QA</button>
+      <span class="sub" hidden><i class="spin dark"></i> Super QA is checking the real page… (30–90 s)</span>
+    </form>
   </div>`;
 }
 
@@ -61,11 +69,15 @@ function message(chat: Chat, m: ChatMessage, i: number): string {
   const files = m.files?.length
     ? `<details class="files"><summary>${m.files.length} file${m.files.length === 1 ? '' : 's'} used from ${esc(m.repo ?? 'the repo')}</summary><ul>${m.files.map((f) => `<li><code>${esc(f)}</code></li>`).join('')}</ul></details>`
     : '';
+  const checked = m.checked?.length
+    ? `<details class="files"${m.superQa ? ' open' : ''}><summary>What Super QA checked</summary><ul>${m.checked.map((c) => `<li>${esc(c)}</li>`).join('')}</ul></details>`
+    : '';
   return `<div class="msg assistant${m.error ? ' error' : ''}">
+    ${m.superQa ? '<span class="badge-superqa">Super QA</span>' : ''}
     ${m.repoError ? `<div class="alert" role="alert">Code context not used: ${esc(m.repoError)}</div>` : ''}
     <div class="bubble report">${renderMarkdown(m.text)}</div>
     ${m.cases?.length ? casesTable(chat, i, m) : ''}
-    ${files}
+    ${files}${checked}
     <div class="sub">${when(m.at)}${m.model ? ` · ${esc(m.model)}` : ''} · ${delMsg(chat, i, false)}</div>
   </div>`;
 }
@@ -131,6 +143,7 @@ export function chatPage(all: Chat[], chat?: Chat, error?: string, typed?: { tex
       .chat-list { list-style:none; padding:0; margin:0; display:grid; gap:6px; } .chat-list li[aria-current] a { font-weight:600; } .chat-list form { display:inline; }
       .tag-edited { font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 4px; } .row-actions { display:flex; gap:8px; font-size:12px; margin-top:4px; } .row-actions form { display:inline; }
       .files ul { margin:4px 0; font-size:12.5px; } .spin.dark { border-color:var(--muted); border-right-color:transparent; vertical-align:middle; }
+      .badge-superqa { display:inline-block; font-size:11px; font-weight:600; color:var(--brand); border:1px solid var(--brand); border-radius:4px; padding:0 6px; margin-bottom:4px; }
     </style>`,
     { section: 'chat' },
   );
@@ -291,6 +304,36 @@ export async function handleChat(req: http.IncomingMessage, res: http.ServerResp
     else msg.cases[k] = c;
     chats.save(chat);
     ctx.redirect(back);
+    return true;
+  }
+
+  if ((m = p.match(/^\/chat\/([\w-]+)\/cases\/(\d+)\/superqa$/)) && post) {
+    const chat = chats.get(m[1]);
+    const n = Number(m[2]);
+    const msg = chat?.messages[n];
+    if (!chat || !msg?.cases?.length) return ctx.send(404, notFound('set of test cases')), true;
+    if (superQaBusy) return ctx.send(409, chatPage(chats.all(), chat, 'Super QA is already checking another set of cases. Try again in a minute.')), true;
+    const missing = superQaMissing();
+    if (missing) return ctx.send(422, chatPage(chats.all(), chat, missing)), true;
+    // The request these cases answer: the last user message before them.
+    const request = chat.messages.slice(0, n).reverse().find((x) => x.role === 'user')?.text ?? chat.title;
+    const history = chat.messages.slice(0, n).filter((x) => !x.error).map((x) => ({ role: x.role, text: x.text }));
+    superQaBusy = true;
+    let reply: ChatMessage;
+    try {
+      const r = await superQa(request, history, msg.cases);
+      reply = { role: 'assistant', text: `${r.reply}\n\n_Checked against the real pages in ${r.seconds}s._`, at: new Date().toISOString(), cases: r.cases, model: r.model, superQa: true, checked: r.checked };
+    } catch (e) {
+      reply = { role: 'assistant', text: `Super QA could not finish: ${(e as Error).message}\n\nCheck [AI keys](/settings/ai) and try again.`, at: new Date().toISOString(), error: true, superQa: true };
+    } finally {
+      superQaBusy = false;
+    }
+    // Saved on the chat as it is now (it may have changed while Super QA ran).
+    const latest = chats.get(chat.id) ?? chat;
+    latest.messages.push(reply);
+    latest.updatedAt = reply.at;
+    chats.save(latest);
+    ctx.redirect(`/chat/${chat.id}#cases-${latest.messages.length - 1}`);
     return true;
   }
 

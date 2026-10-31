@@ -27,7 +27,7 @@ const HISTORY = 10;
 const SITE_CHARS = 12_000;
 
 /** Values that must never reach an AI provider: login details, keys and tokens from .env. */
-function secrets(): string[] {
+export function secrets(): string[] {
   return Object.entries(process.env)
     .filter(([k, v]) => v && v.length >= 6 && /PASSWORD|PHONE|KEY|TOKEN|SECRET/i.test(k))
     .flatMap(([, v]) => v!.split(',').map((x) => x.trim()))
@@ -79,7 +79,7 @@ export function siteContext(question: string): string {
   return out.join('\n');
 }
 
-const SYSTEM = `You are the SL QA Assistant. SL QA is a QA robot for the slshop.cloud shop admin dashboard (an online-shop back office: orders, POS, products, inventory, customers, accounting, storefront, settings).
+export const SYSTEM = `You are the SL QA Assistant. SL QA is a QA robot for the slshop.cloud shop admin dashboard (an online-shop back office: orders, POS, products, inventory, customers, accounting, storefront, settings).
 How SL QA works: a person adds a suite of test cases (from a Google Sheet, a CSV/XLSX file, or typed in). Each case has a dashboard page (URL), steps and expected results written as plain sentences. A browser robot, logged in as the store owner, opens the page, does the steps and checks the expected results, then writes a report (Pass, Fail, Review, Blocked) with screenshots. Sentences outside its rules can be rewritten by AI into its step language; a person approves them.
 
 You help the QA team: answer questions about the dashboard and its pages, explain how to test something, and write test cases.

@@ -161,17 +161,23 @@ async function pace(p: Provider): Promise<void> {
   lastCall.set(p.id, Date.now());
 }
 
-/** Narrows the chain for one call: `only` = just these provider ids, `exclude` = all but these (e.g. a fallback try without Claude). `maxTokens` = longer answers (default 700). */
-export interface ChainOptions { only?: string[]; exclude?: string[]; maxTokens?: number }
+/**
+ * Narrows the chain for one call: `only` = just these provider ids, tried in the order given; `exclude` = all but these (e.g. a fallback try without Claude).
+ * `maxTokens` = longer answers (default 700). `ignorePaidCap` = a person asked for this call (Super QA): paid providers are
+ * used even past AI_PAID_DAILY_LIMIT, but the call is still counted. `models` = a model per provider id for this call.
+ */
+export interface ChainOptions { only?: string[]; exclude?: string[]; maxTokens?: number; ignorePaidCap?: boolean; models?: Record<string, string> }
 
 /**
  * Sends one request through the chain in PROVIDERS order (paid fallbacks within the daily cap).
  * `parse` validates the answer; an answer that does not parse counts as a failure and the next provider is tried.
  */
-export async function complete<T>(system: string, user: string, parse: (text: string) => T, image?: string, opts: ChainOptions = {}): Promise<{ value: T; provider: Provider; model: string; attempts: Attempt[] }> {
+export async function complete<T>(system: string, user: string, parse: (text: string) => T, image?: string | string[], opts: ChainOptions = {}): Promise<{ value: T; provider: Provider; model: string; attempts: Attempt[] }> {
   const u = usage();
   const attempts: Attempt[] = [];
-  const chain = PROVIDERS.filter((p) => (!opts.only || opts.only.includes(p.id)) && !opts.exclude?.includes(p.id));
+  const chain = PROVIDERS.filter((p) => (!opts.only || opts.only.includes(p.id)) && !opts.exclude?.includes(p.id))
+    .sort((a, b) => (opts.only ? opts.only.indexOf(a.id) - opts.only.indexOf(b.id) : 0));
+  const modelFor = (p: Provider) => (opts.models?.[p.id] ? safeModel(p, opts.models[p.id]) : modelOf(p));
   if (!configured().length) throw new AiError('No AI key is set. Add ANTHROPIC_API_KEY (or a free key such as GEMINI_API_KEY) to .env and restart.', 'none');
   if (!chain.some((p) => keysOf(p).length)) throw new AiError(`No AI key is set for ${opts.only ? opts.only.join(', ') : 'the fallback providers'}.`, 'none');
 
@@ -181,20 +187,20 @@ export async function complete<T>(system: string, user: string, parse: (text: st
       const slot = `${p.id}#${i}`;
       const cd = u.coolDown[slot];
       if (cd && cd.until > Date.now()) {
-        attempts.push({ provider: p.name, model: modelOf(p), ok: false, error: `skipped (${cd.reason}, retry after ${new Date(cd.until).toLocaleTimeString()})` });
+        attempts.push({ provider: p.name, model: modelFor(p), ok: false, error: `skipped (${cd.reason}, retry after ${new Date(cd.until).toLocaleTimeString()})` });
         continue;
       }
-      if (p.tier === 'paid' && u.paidCalls >= paidDailyLimit()) {
-        attempts.push({ provider: p.name, model: modelOf(p), ok: false, error: `paid daily limit reached (${paidDailyLimit()} calls); free providers will be tried again tomorrow or after their cool-down` });
+      if (p.tier === 'paid' && !opts.ignorePaidCap && u.paidCalls >= paidDailyLimit()) {
+        attempts.push({ provider: p.name, model: modelFor(p), ok: false, error: `paid daily limit reached (${paidDailyLimit()} calls); free providers will be tried again tomorrow or after their cool-down` });
         continue;
       }
-      const model = modelOf(p);
+      const model = modelFor(p);
       try {
         if (p.tier === 'paid') u.paidCalls++;
         await pace(p);
-        // A screenshot (base64 JPEG) goes only to providers that read images; the others get the text alone.
-        const img = p.vision ? image : undefined;
-        const said = img ? `${user}\n(A screenshot of the page as it is now is attached.)` : user;
+        // Screenshots (base64 JPEG) go only to providers that read images; the others get the text alone.
+        const img = p.vision && image?.length ? [image].flat() : undefined;
+        const said = img ? `${user}\n(${img.length > 1 ? `${img.length} screenshots are attached, in the order described above.` : 'A screenshot of the page as it is now is attached.'})` : user;
         const text = p.api === 'anthropic' ? await callAnthropic(p, key, model, system, said, img, opts.maxTokens) : await callOpenAICompatible(p, key, model, system, said, img, opts.maxTokens);
         let value: T;
         try {
@@ -235,7 +241,10 @@ function classify(status: number, message: string): AiError['kind'] {
 /** Free tiers sometimes queue a request for minutes; give up quickly and use the next provider instead. */
 const TIMEOUT_MS = { primary: 45_000, free: 20_000, paid: 45_000 };
 /** Long answers (chat) take longer to write: double the wait for them. */
-const timeoutFor = (p: Provider, maxTokens: number) => TIMEOUT_MS[p.tier] * (maxTokens > 700 ? 2 : 1);
+const timeoutFor = (p: Provider, maxTokens: number) => TIMEOUT_MS[p.tier] * (maxTokens > 4000 ? 3 : maxTokens > 700 ? 2 : 1);
+
+/** OpenAI's reasoning models (gpt-5*, o1/o3/o4…) reject a non-default temperature and want reasoning_effort. */
+const reasoningModel = (p: Provider, model: string) => p.id === 'openai' && /^(gpt-5|o\d)/i.test(model);
 
 async function post(url: string, headers: Record<string, string>, body: unknown, timeoutMs = TIMEOUT_MS.paid): Promise<{ status: number; json: any }> {
   const ctl = new AbortController();
@@ -252,9 +261,13 @@ async function post(url: string, headers: Record<string, string>, body: unknown,
   }
 }
 
-async function callOpenAICompatible(p: Provider, key: string, model: string, system: string, user: string, image?: string, maxTokens = 700): Promise<string> {
-  const content = image ? [{ type: 'text', text: user }, { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${image}` } }] : user;
-  const body: Record<string, unknown> = { model, temperature: 0, max_tokens: maxTokens, messages: [{ role: 'system', content: system }, { role: 'user', content }] };
+async function callOpenAICompatible(p: Provider, key: string, model: string, system: string, user: string, images?: string[], maxTokens = 700): Promise<string> {
+  const content = images?.length ? [{ type: 'text', text: user }, ...images.map((b64) => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }))] : user;
+  const body: Record<string, unknown> = { model, messages: [{ role: 'system', content: system }, { role: 'user', content }] };
+  // OpenAI itself only takes max_completion_tokens (current models reject max_tokens); the compatible APIs take max_tokens.
+  body[p.id === 'openai' ? 'max_completion_tokens' : 'max_tokens'] = maxTokens;
+  if (reasoningModel(p, model)) body.reasoning_effort = 'low';
+  else body.temperature = 0;
   if (p.jsonMode) body.response_format = { type: 'json_object' };
   Object.assign(body, p.extraBody ?? {});
   const { status, json } = await post(`${p.baseUrl}/chat/completions`, { authorization: `Bearer ${key}`, ...(p.extraHeaders ?? {}) }, body, timeoutFor(p, maxTokens));
@@ -266,8 +279,8 @@ async function callOpenAICompatible(p: Provider, key: string, model: string, sys
   return text;
 }
 
-async function callAnthropic(p: Provider, key: string, model: string, system: string, user: string, image?: string, maxTokens = 700): Promise<string> {
-  const content = image ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: image } }, { type: 'text', text: user }] : user;
+async function callAnthropic(p: Provider, key: string, model: string, system: string, user: string, images?: string[], maxTokens = 700): Promise<string> {
+  const content = images?.length ? [...images.map((data) => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data } })), { type: 'text', text: user }] : user;
   const { status, json } = await post(`${p.baseUrl}/messages`, { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, { model, max_tokens: maxTokens, temperature: 0, system, messages: [{ role: 'user', content }] }, timeoutFor(p, maxTokens));
   const msg = String(json?.error?.message ?? '');
   if (status >= 300) throw new AiError(`${p.name} ${status}: ${msg || 'request failed'}`, classify(status, msg));

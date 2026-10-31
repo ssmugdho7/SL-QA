@@ -34,6 +34,9 @@ export interface ChatMessage {
   repoError?: string;
   model?: string;
   error?: boolean;
+  /** Made by Super QA (cases corrected against the real page); `checked` = what it looked at. */
+  superQa?: boolean;
+  checked?: string[];
 }
 
 export interface Chat {
