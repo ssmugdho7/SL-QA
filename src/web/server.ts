@@ -12,6 +12,7 @@ import { cancel, crawlState, enqueue, recover, startCrawl, syncSiteSuite } from 
 import { loadSiteMap, siteCases, siteMapAge } from '../engine/apps/slshop/crawl.js';
 import { knownPages } from '../engine/pages.js';
 import { handleChat } from './chat.js';
+import { guidePage } from './guide.js';
 import { newId, runs, suites, uploadsDir, type Run, type Suite } from './store.js';
 import { aiKeysPage, examplePage, helpPage, homePage, issueFormPage, layout, notFound, reportPage, rewritesPage, runPage, runsPage, SAMPLE_CSV, suitePage, type RewriteRow, type SiteInfo } from './views.js';
 import { previewCase } from '../engine/phrases/index.js';
@@ -189,7 +190,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   if ((m = p.match(/^\/suites\/([\w-]+)\/rewrites\/suggest$/)) && post) {
     const s = suites.get(m[1]);
     if (!s) return send(res, 404, notFound('suite'));
-    if (!aiProvider()) return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent('No AI key is set. Add a free key such as GEMINI_API_KEY or GROQ_API_KEY to .env and restart SL QA (see How to use → AI keys).')}`);
+    if (!aiProvider()) return redirect(res, `/suites/${s.id}/rewrites?msg=${encodeURIComponent('No AI key is set. Add a free key such as GEMINI_API_KEY or GROQ_API_KEY to .env and restart SL QA (see Full reference → AI keys).')}`);
     const { unknown } = rewriteState(s);
     const all = loadTranslations();
     let made = 0;
@@ -347,6 +348,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     return void res.end();
   }
 
+  if (p === '/guide' && !post) return send(res, 200, guidePage());
   if (p === '/help' && !post) return send(res, 200, helpPage());
 
   if (p === '/help/sample.csv' || p === '/help/example.csv') {

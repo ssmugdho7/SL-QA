@@ -21,12 +21,12 @@ const duration = (a?: string, b?: string) => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-type Section = 'suites' | 'runs' | 'chat' | 'help' | 'ai';
+type Section = 'suites' | 'runs' | 'chat' | 'help' | 'guide' | 'ai';
 
 const FAVICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#d6243a"/><path d="M9 16.5l4.5 4.5L23 11.5" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>')}`;
 
 export function layout(title: string, body: string, opts: { refresh?: boolean; section?: Section } = {}): string {
-  const nav = ([['suites', '/', 'Suites'], ['runs', '/runs', 'Runs'], ['chat', '/chat', 'Assistant'], ['ai', '/settings/ai', 'AI keys'], ['help', '/help', 'How to use']] as const)
+  const nav = ([['suites', '/', 'Suites'], ['runs', '/runs', 'Runs'], ['chat', '/chat', 'Assistant'], ['ai', '/settings/ai', 'AI keys'], ['guide', '/guide', 'Guide']] as const)
     .map(([key, href, label]) => `<a href="${href}"${opts.section === key ? ' aria-current="page"' : ''}>${label}</a>`)
     .join('');
   return `<!doctype html>
@@ -132,7 +132,7 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
       </form>
     </section>
     ${all.length ? wrap(`<table><thead><tr><th>Suite</th><th class="num">Cases</th><th>Understood by the bot</th><th>Last run</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)
-      : `<div class="empty"><b>No suites yet.</b><br>Add your first list of cases below: a Google Sheet, a file, or type them in by hand.<br><a href="/help">New here? Read How to use</a> · <a href="/example">Try the example suite</a> · <a href="/help/sample.csv">Download a sample sheet</a></div>`}
+      : `<div class="empty"><b>No suites yet.</b><br>Add your first list of cases below: a Google Sheet, a file, or type them in by hand.<br><a href="/guide">New here? Read the Guide</a> · <a href="/example">Try the example suite</a> · <a href="/help/sample.csv">Download a sample sheet</a></div>`}
     <details class="card" id="add"${error || typed ? ' open' : ''}>
       <summary><h2 style="display:inline">Add a test suite</h2></summary>
       ${error ? `<div class="alert" role="alert">${esc(error)}</div>` : ''}
@@ -296,7 +296,7 @@ export function rewriteBanner(s: Suite, unknownCount: number, pending: number, p
   if (!unknownCount && !pending) return '';
   const action = provider
     ? `<form method="post" action="/suites/${s.id}/rewrites/suggest" class="inline"><button class="primary">✨ Ask AI to suggest rewrites</button></form>`
-    : '<span class="sub">Without an AI key these sentences are skipped. To get AI help, add a free key such as <code>GEMINI_API_KEY</code> or <code>GROQ_API_KEY</code> to <code>.env</code> and restart. See <a href="/help#ai-keys">How to use → AI keys</a>.</span>';
+    : '<span class="sub">Without an AI key these sentences are skipped. To get AI help, add a free key such as <code>GEMINI_API_KEY</code> or <code>GROQ_API_KEY</code> to <code>.env</code> and restart. See <a href="/help#ai-keys">Full reference → AI keys</a>.</span>';
   return `<div class="card ai-banner"><div><b>${plural(unknownCount, 'sentence')} the bot does not understand yet.</b>
     ${pending ? `${plural(pending, 'AI suggestion')} waiting for review.` : ''}
     <div class="sub">During a run, the AI turns them into simple steps (CLICK, TYPE, EXPECT TEXT…) on the spot; those steps are marked AI in the results. You can also get suggestions now and check them first. Approved rewrites are reused without calling the AI, so each sentence needs it only once.${provider ? ` Tries, in order: ${esc(provider.chain.join(' → '))}. Paid calls today: ${provider.paidUsed} of ${provider.paidLimit}.` : ''}</div></div>
@@ -358,7 +358,7 @@ export function aiKeysPage(rows: ReturnType<typeof import('../engine/ai/provider
     <p>Paid calls today: <b>${paid.used} of ${paid.limit}</b> <span class="sub">(change with <code>AI_PAID_DAILY_LIMIT</code>; 0 = never use paid keys)</span></p>
     ${wrap(`<table><thead><tr><th>Provider</th><th>.env name</th><th>Key</th><th>Model</th><th>Today</th><th></th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table>`)}
     <form method="post" action="/settings/ai/reset" class="inline"><button>Try skipped providers again now</button></form>
-    <p class="sub">Keys are read from the <code>.env</code> file when SL QA starts; after changing it, restart SL QA. Several keys for one provider can be separated by commas. See <a href="/help#ai-keys">How to use → AI keys</a>.</p>`,
+    <p class="sub">Keys are read from the <code>.env</code> file when SL QA starts; after changing it, restart SL QA. Several keys for one provider can be separated by commas. See <a href="/help#ai-keys">Full reference → AI keys</a>.</p>`,
     { section: 'ai' },
   );
 }
@@ -998,7 +998,7 @@ export function notFound(what = 'page'): string {
     case: 'It may have been deleted, or the sheet was re-read without it.',
   };
   return layout('Not found', `<div class="empty"><h1>That ${esc(what)} doesn't exist</h1><p>${hint[what] ?? 'The link may be mistyped or out of date.'}</p>
-    <div class="toolbar center"><a class="button primary" href="/">Go to Suites</a><a class="button" href="/runs">Runs</a><a class="button" href="/help">How to use</a></div></div>`);
+    <div class="toolbar center"><a class="button primary" href="/">Go to Suites</a><a class="button" href="/runs">Runs</a><a class="button" href="/guide">Guide</a></div></div>`);
 }
 
 const JS = `

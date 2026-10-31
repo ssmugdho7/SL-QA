@@ -135,7 +135,7 @@ export function chatPage(all: Chat[], chat?: Chat, error?: string, typed?: { tex
     <style>
       .chat-grid { display:grid; grid-template-columns:minmax(0,1fr) 260px; gap:20px; align-items:start; } .chat-grid aside { margin-top:0; position:sticky; top:70px; }
       @media (max-width:900px) { .chat-grid { grid-template-columns:1fr; } .chat-grid aside { position:static; } }
-      .chat-log { display:grid; gap:14px; }
+      .chat-log { display:grid; gap:14px; } .chat-form { max-width:none; }
       .msg .bubble { border:1px solid var(--line); border-radius:8px; padding:10px 14px; background:var(--card); overflow-wrap:anywhere; }
       .msg.user { justify-self:end; max-width:80%; text-align:right; } .msg.user .bubble { text-align:left; background:color-mix(in srgb, var(--brand) 8%, var(--card)); }
       .msg.assistant .bubble.report { padding:4px 16px; } .msg.error .bubble { border-color:color-mix(in srgb, var(--fail) 40%, var(--line)); }
