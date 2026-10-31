@@ -225,7 +225,7 @@ export async function explore(cases: TestCase[]): Promise<{ findings: Finding[];
 
 const RULES = `
 SUPER QA: you are reviewing test cases another assistant proposed, against what is REALLY on the pages (findings and screenshots below, taken just now in a logged-in browser). Return a corrected set:
-- Use ONLY page names, buttons, fields, tabs, records and dropdown options actually seen in the FINDINGS (or the site map when the findings do not cover a page). Replace invented or placeholder names (e.g. 'BTB Test Product', 'Electronics') with real ones from the findings; when a real record was opened, use its exact name.
+- Use ONLY page names, buttons, fields, tabs, records and dropdown options actually seen in the FINDINGS (or the site map when the findings do not cover a page). Replace invented or placeholder names (e.g. 'Test Product', 'Electronics') with real ones from the findings; when a real record was opened, use its exact name.
 - Dropdown lists may also hold controls such as 'Create new …' or 'Select all N'; those are not options to pick unless the request is about them.
 - Name dropdown choices exactly as found, one step each (e.g. "Select '<real option>' in 'Category'").
 - The url and the first steps must agree: if url is a record's own page (…?id=…), do not add steps that open that record again; if url is a list, open the record by its real name first.

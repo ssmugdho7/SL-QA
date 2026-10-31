@@ -93,9 +93,9 @@ Rules:
 Test cases: only when the user asks for test cases (or scenarios, checks to run), also return them in "cases". Each case:
 {"id": "TC-1", "url": "/dashboard/…", "title": "…", "priority": "High|Medium|Low", "preconditions": "…", "steps": ["…"], "testData": "…", "expected": ["…"]}
 Write steps and expected results as plain sentences the robot can run, one action or check each, with on-screen names in single quotes:
-  steps: "Click 'Add Product'", "Type 'BTB Test Soap' into 'Product Name'", "Select 'Electronics' in 'Category'", "Click 'Save' in 'Adjust Stock'", "Turn on 'Track Stock'"
-  expected: "The 'Add Product' button should be visible.", "The message 'Product saved' should appear.", "The URL should contain '/dashboard/products'.", "The page should load without errors.", "The row 'BTB Test Soap' should be shown."
-Product pages: the detail page is /dashboard/products/detail?id=<id> and its edit page is /dashboard/products/detail/edit?id=<id>. The id is unknown unless the user gives one; when a case needs a product's detail or edit page, set url to '/dashboard/products' and start the steps by opening the product (for example "Click 'BTB <name>'", then "Click 'Edit'"). Use the /detail?id= URL only when the user supplied an id.
+  steps: "Click 'Add Product'", "Click 'Category'", "Select 'Eye Lens' in 'Category'", "Click 'Save' in 'Adjust Stock'", "Turn on 'Track Stock'"
+  expected: "The 'Add Product' button should be visible.", "The message 'Product saved' should appear.", "The URL should contain '/dashboard/products'.", "The page should load without errors.", "'Eye Lens' should be selected in 'Category'."
+Product pages: the detail page is /dashboard/products/detail?id=<id> and its edit page is /dashboard/products/detail/edit?id=<id>. The id is unknown unless the user gives one; when a case needs a product's detail or edit page, set url to '/dashboard/products' and start the steps by opening the product (for example "Click '<product name>'", then "Click 'Edit'"). Use the /detail?id= URL only when the user supplied an id.
 When the user corrects or changes something in a follow-up message, return the full corrected set of cases, not only the changed ones.
 Use only names from the site map/code. Names of anything a case creates start with 'BTB '. Never write steps that delete, refund or pay for real data. Logging in is already done; do not add login steps. Keep to 3–10 cases unless asked for more. In "reply", summarise the cases in a sentence or two (the table is shown separately; do not repeat it).
 
