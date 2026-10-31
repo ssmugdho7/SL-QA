@@ -1150,6 +1150,14 @@ export const EXPECT_RULES: ExpectRule[] = [
     },
   },
   {
+    name: 'url contains',
+    pattern: /^the (?:page )?url should (?:contain|include|end with|be) '([^']+)'$/i,
+    check: async (t, m) => {
+      const at = new URL(t.page.url());
+      t.check(`The URL contains '${m[1]}'`, `${at.pathname}${at.search}`.includes(m[1]), `the page is ${at.pathname}${at.search}`, 'The action did not navigate where expected.');
+    },
+  },
+  {
     name: 'redirected to page',
     pattern: when(/^(?:the user |user |it |you |i )?(?:should|must) (?:be )?(?:redirected|taken|navigated|sent|brought|moved|go(?:ne)?) (?:back )?to (?:the )?(.+?)(?: page| screen)?$/i, (m) => !!pagePath(m[1])),
     check: async (t, m) => {
@@ -1250,7 +1258,8 @@ export const EXPECT_RULES: ExpectRule[] = [
     pattern: when(/^(.+?) (?:should|must) (?:be )?(?:displayed|shown|visible|present|listed|appear|show up)(?: on (?:the )?(?:page|screen|dashboard|header|top))?$/i, (m) => !!shownNames(m[1])),
     check: async (t, m) => {
       const names = shownNames(m[1])!;
-      const page = await bodyText(t);
+      // Fields are often named only by their placeholder or aria-label, which are not in the page text.
+      const page = `${await bodyText(t)} ${(await t.page.locator('input, textarea').evaluateAll((es) => es.map((e) => `${e.getAttribute('placeholder') ?? ''} | ${e.getAttribute('aria-label') ?? ''}`).join(' | ')).catch(() => ''))}`;
       const missing = names.filter((n) => !has(page, n));
       t.check(`${names.map((n) => `'${n}'`).join(', ')} ${names.length > 1 ? 'are' : 'is'} shown`, !missing.length, missing.length ? `not on the page: ${list(missing)}${nearest(page, missing[0])}` : 'all on the page',
         'The text or control is missing, renamed or hidden on this page.');

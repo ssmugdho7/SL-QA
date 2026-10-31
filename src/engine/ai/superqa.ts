@@ -231,6 +231,7 @@ SUPER QA: you are reviewing test cases another assistant proposed, against what 
 - The url and the first steps must agree: if url is a record's own page (…?id=…), do not add steps that open that record again; if url is a list, open the record by its real name first.
 - Fix wrong URLs and wrong or missing steps (for example a dropdown that must be opened first, a tab to switch to, an Edit button on the detail page).
 - Steps are actions only; every check ("… should …") goes to expected. Each case must have at least one expected result that can be seen on screen.
+- Expected results must be checkable in the robot's forms (quoted names, URL parts, messages, selected options). Rewrite vague ones such as "The list should be filtered to Draft orders" into what you saw (e.g. "The URL should contain 'status=draft'."). Do not add a step that opens the case's own url.
 - Keep cases runnable by the robot's step language (examples in the rules above). Keep the user's intent and the same number of cases unless one is wrong or duplicated.
 - Do not change real data unless the user's request needs it; never delete, refund or pay. If a case must save, say so in preconditions.
 - In "reply": a short Markdown list of what was wrong and what you changed (or that the cases were already right). No HTML.

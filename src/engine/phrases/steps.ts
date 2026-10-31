@@ -307,6 +307,14 @@ export const STEP_RULES: StepRule[] = [
     },
   },
   {
+    name: 'open quoted path',
+    pattern: new RegExp(`^(?:open|go to|visit|navigate to) (?:the )?['"](/[^'"\\s]*)['"](?: page)?$`, 'i'),
+    run: async (t, m) => {
+      await t.ui.goto(m[1]);
+      return `Opened ${m[1]}.`;
+    },
+  },
+  {
     name: 'open dashboard page',
     // Only targets that read like a page: "open the Filter panel", "open a product", "Open the Stock tab" are not navigation.
     pattern: new RegExp(`^(?:open|go to|go back to|return to|navigate to|visit|switch to|move to|head to) (?:the )?${PAGE_TARGET}(?: (?:from|in|on|via|using) the (?:left )?(?:sidebar|side ?bar|menu|side menu|navigation(?: menu)?))?$`, 'i'),
@@ -636,9 +644,11 @@ export const STEP_RULES: StepRule[] = [
     name: 'row button on a product',
     pattern: /^(?:on (?:a|an|any|the) (variable |simple )?product,? )?click '(view variants|quick view|more details|edit|price|stock)'(?: on (?:a |an |the )?(.*?))?(?: to .*)?$/i,
     run: async (t, m) => {
+      const label = m[2];
+      // On a record's own page (detail, edit) the button is the page's, not a row's.
+      if (!m[1] && !m[3] && !(await t.ui.isListPage())) return clickNamed(t, label);
       const hint = `${m[1] ?? ''} ${m[3] ?? ''}`;
       const name = await rowName(t, hint || 'variable');
-      const label = m[2];
       if (/more details/i.test(label)) {
         await t.ui.setView('grid');
         await t.ui.gridCard(name).getByRole('button', { name: /more details/i }).click();
