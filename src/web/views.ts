@@ -79,27 +79,6 @@ export interface SuiteForm { kind: string; name: string; url: string; pagePath: 
 /** The whole-dashboard check: when the site map was made, a crawl in progress, the suite built from it. */
 export interface SiteInfo { generatedAt?: string; pages: number; stale: boolean; crawling?: { pages: number; startedAt: string }; error?: string; suiteId?: string; msg?: string }
 
-function siteCard(x: SiteInfo): string {
-  const state = x.crawling
-    ? `<p role="status"><span class="badge running"><i class="spin"></i>Crawling</span> ${plural(x.crawling.pages, 'page')} read so far, started ${duration(x.crawling.startedAt)} ago. Nothing on the store is changed.</p>`
-    : x.generatedAt
-      ? `<p class="sub">Site map: ${plural(x.pages, 'page')}, crawled ${when(x.generatedAt)}${x.stale ? ' · <span class="warn">over 7 days old, it will be crawled again</span>' : ''}.</p>`
-      : '<p class="sub">No site map yet: the first check crawls the dashboard (about 5 minutes).</p>';
-  return `<section class="card site-check" id="site">
-    <h2>🔎 Check the whole dashboard</h2>
-    <p class="hint">One case per dashboard page, no writing needed: each page should load without errors or NaN/undefined values and show its heading; its tabs, Filter panel, search box and next page are tried. Read-only: nothing is created, saved or deleted.</p>
-    ${x.msg ? `<div class="alert info" role="status">${esc(x.msg)}</div>` : ''}
-    ${x.error && !x.crawling ? `<div class="alert" role="alert">The last crawl stopped: ${esc(x.error)}</div>` : ''}
-    ${state}
-    <div class="toolbar">
-      <form method="post" action="/site" class="inline"><button class="primary"${x.crawling ? ' disabled' : ''}>${x.suiteId ? 'Update the dashboard suite' : 'Check the whole dashboard'}</button></form>
-      ${x.generatedAt ? `<form method="post" action="/site" class="inline"><input type="hidden" name="recrawl" value="1"><button${x.crawling ? ' disabled' : ''} title="Walk the dashboard again to pick up new or changed pages">↻ Re-crawl</button></form>` : ''}
-      ${x.suiteId ? `<a class="button" href="/suites/${x.suiteId}">Open the suite</a>` : ''}
-    </div>
-    ${x.crawling ? '<script>setTimeout(() => location.reload(), 4000)</script>' : ''}
-  </section>`;
-}
-
 export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: string, typed?: SuiteForm, site?: SiteInfo): string {
   const f: SuiteForm = typed ?? { kind: 'sheet', name: '', url: '', pagePath: '/dashboard/products' };
   const rows = all
@@ -121,8 +100,7 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
   return layout(
     'Suites',
     `<div class="page-head"><div><h1>Test suites</h1><p class="sub">A suite is one list of cases (test cases or bugs) for the bot to check on slshop.cloud.</p></div>
-      <div class="toolbar"><a class="button" href="#site">🔎 Check the whole dashboard</a><a class="button primary" href="#add">＋ New suite</a></div></div>
-    ${site ? siteCard(site) : ''}
+      <div class="toolbar"><a class="button primary" href="#add">＋ New suite</a></div></div>
     <section class="card" id="assistant">
       <h2>💬 Ask the Assistant</h2>
       <p class="hint">Questions about a dashboard page, or test cases written for you (saved as a suite in one click). It answers from the site map, your suites and, if you give it, the app's GitHub repo.</p>

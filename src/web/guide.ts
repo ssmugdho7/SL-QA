@@ -10,7 +10,7 @@ const STEPS: Step[] = [
   { icon: '🔍', title: 'Use Super QA (optional)', text: 'A stronger model re-checks the cases against the real pages.', href: '/chat', go: 'Open Assistant',
     tips: ['Catches cases that do not match the live site.', 'Slower, so use it once the list looks right.'] },
   { icon: '💾', title: 'Save as a suite', text: 'Save the cases as a suite, or skip the Assistant and import your own Sheet or CSV.', href: '/#add', go: 'Add a suite',
-    tips: ['“Save as new suite” in the Assistant, or “Download CSV”.', 'Import a Google Sheet, upload CSV/XLSX, or type cases by hand.', 'Use “Check the whole dashboard” to auto-build a suite.'] },
+    tips: ['“Save as new suite” in the Assistant, or “Download CSV”.', 'Import a Google Sheet, upload CSV/XLSX, or type cases by hand.'] },
   { icon: '🧐', title: 'Check the bot understood', text: 'Open the suite and look at coverage. Approve AI rewrites of unclear steps.', href: '/', go: 'Open Suites',
     tips: ['Coverage shows which cases the bot can actually run.', 'Review rewrites lets you accept or reject each AI rewrite.', 'Fix cases it could not understand before running.'] },
   { icon: '▶️', title: 'Run', text: 'Start a run. The bot walks through every case in a real browser.', href: '/runs', go: 'See Runs',
