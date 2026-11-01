@@ -98,7 +98,7 @@ Write steps and expected results as plain sentences the robot can run, one actio
 Product pages: the detail page is /dashboard/products/detail?id=<id> and its edit page is /dashboard/products/detail/edit?id=<id>. The id is unknown unless the user gives one; when a case needs a product's detail or edit page, set url to '/dashboard/products' and start the steps by opening the product (for example "Click '<product name>'", then "Click 'Edit'"). Use the /detail?id= URL only when the user supplied an id.
 The robot already starts on the case's url: do not add a step that opens it. Every expected result must be one of the forms above, naming something visible on screen in quotes (e.g. "The URL should contain '?status=draft'."); never vague ones such as "The list should be filtered" or "The changes should be saved".
 When the user corrects or changes something in a follow-up message, return the full corrected set of cases, not only the changed ones.
-Use only names from the site map/code. Names of anything a case creates start with 'BTB '. Never write steps that delete, refund or pay for real data. Logging in is already done; do not add login steps. Keep to 3–10 cases unless asked for more. In "reply", summarise the cases in a sentence or two (the table is shown separately; do not repeat it).
+Use only names from the site map/code. Existing records (categories, products, customers, options, attributes) are named by their REAL names from the site map, findings or the user's message, never by made-up ones. Only a NEW record the case itself creates gets a name starting with 'BTB ' (e.g. "Type 'BTB Test Product' in 'Name'"). If the real name of an existing record is unknown, do not invent one (no 'BTB Category A'): say what is needed in preconditions (e.g. "Two existing categories, e.g. 'Eye Lens' and 'Makeup'") and refer to it generically in the steps. Never write steps that delete, refund or pay for real data. Logging in is already done; do not add login steps. Keep to 3–10 cases unless asked for more. In "reply", summarise the cases in a sentence or two (the table is shown separately; do not repeat it).
 
 Reply with JSON only: {"reply": "<markdown answer>", "cases": [ … ]}  ("cases" may be omitted or empty).`;
 
@@ -131,7 +131,10 @@ export function toCases(raw: unknown): TestCase[] {
 }
 
 /** Answers the last user message, using the earlier turns as history. */
-export async function answer(history: ChatTurn[], question: string, ctx: { repoUrl?: string; suites: { name: string; titles: string[] }[] }): Promise<ChatAnswer> {
+/** 'ask' = questions only (no cases); 'cases' = write test cases. */
+export type Purpose = 'ask' | 'bug' | 'cases';
+
+export async function answer(history: ChatTurn[], question: string, ctx: { repoUrl?: string; suites: { name: string; titles: string[] }[]; purpose?: Purpose }): Promise<ChatAnswer> {
   if (!configured().length) {
     return { reply: 'No AI key is set, so the Assistant cannot answer yet. Add a key (a free **GEMINI_API_KEY** is enough) on [AI keys](/settings/ai), restart SL QA, then ask again.', cases: [], files: [] };
   }
@@ -157,7 +160,8 @@ EXISTING SUITES (case titles already written; avoid duplicating them):
 ${suites || '(none)'}
 ${repo ? `\nCODE from ${repo.label} (selected files):\n${code}` : ''}`;
   const convo = history.slice(-HISTORY).map((t) => `${t.role === 'user' ? 'User' : 'Assistant'}: ${t.text.slice(0, 3000)}`).join('\n\n');
-  const user = `${convo ? `Conversation so far:\n${convo}\n\n` : ''}User: ${question}`;
+  const goal = ctx.purpose === 'cases' ? '\n(The user chose "Generate test cases": return the cases in "cases".)' : ctx.purpose === 'ask' ? '\n(The user chose "Ask about slshop.cloud": answer the question; return no cases.)' : '';
+  const user = `${convo ? `Conversation so far:\n${convo}\n\n` : ''}User: ${question}${goal}`;
   const parse = (text: string): Raw => {
     const json = text.match(/\{[\s\S]*\}/)?.[0];
     if (!json) throw new Error('no JSON');

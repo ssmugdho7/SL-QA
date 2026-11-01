@@ -3,6 +3,8 @@ import path from 'path';
 import { config } from '../engine/config.js';
 import type { CaseResult } from '../engine/context.js';
 import type { TestCase } from '../engine/sources/cases.js';
+import type { Bug } from '../engine/ai/bughunt.js';
+import type { Purpose } from '../engine/ai/chat.js';
 
 /**
  * File-based storage for the MVP: one JSON file per suite and per run under data/.
@@ -37,6 +39,10 @@ export interface ChatMessage {
   /** Made by Super QA (cases corrected against the real page); `checked` = what it looked at. */
   superQa?: boolean;
   checked?: string[];
+  /** What the user asked for (shown as a tag); 'bug' messages carry `where`/`focus`, their replies `bugs`. */
+  purpose?: Purpose;
+  where?: string;
+  bugs?: Bug[];
 }
 
 export interface Chat {
@@ -44,6 +50,8 @@ export interface Chat {
   title: string;
   /** GitHub URL given as code context (kept for the next question). */
   repoUrl?: string;
+  /** Purpose last used (the default for the next message). */
+  purpose?: Purpose;
   messages: ChatMessage[];
   createdAt: string;
   updatedAt: string;
@@ -110,12 +118,17 @@ export const runs = {
   forSuite: (suiteId: string) => runs.all().filter((r) => r.suiteId === suiteId),
 };
 
+/** Folder for a chat's files (bug-hunt screenshots in shots/). */
+export const chatFiles = (id: string) => path.join(dir('chats'), id);
+
 export const chats = {
   all: () => readAll<Chat>('chats').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
   get: (id: string) => read<Chat>('chats', id),
   save: (c: Chat) => write('chats', c.id, c),
   remove: (id: string) => {
-    if (/^[\w-]+$/.test(id)) fs.rmSync(path.join(dir('chats'), `${id}.json`), { force: true });
+    if (!/^[\w-]+$/.test(id)) return;
+    fs.rmSync(path.join(dir('chats'), `${id}.json`), { force: true });
+    fs.rmSync(chatFiles(id), { recursive: true, force: true });
   },
 };
 

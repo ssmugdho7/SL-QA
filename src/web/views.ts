@@ -25,10 +25,30 @@ type Section = 'suites' | 'runs' | 'chat' | 'help' | 'guide' | 'ai';
 
 const FAVICON = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#d6243a"/><path d="M9 16.5l4.5 4.5L23 11.5" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>')}`;
 
+/** Inline 24×24 stroke icons (no icon library, CSP-friendly). */
+const ICON: Record<string, string> = {
+  chat: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/>',
+  suites: '<path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/>',
+  runs: '<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/>',
+  ai: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+  guide: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5M9 7h6M9 11h6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/>',
+  ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+};
+export const icon = (name: keyof typeof ICON | string, cls = 'ico') =>
+  `<svg class="${cls}" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON[name] ?? ''}</svg>`;
+
+const NAV: [group: string, items: [key: Section, href: string, label: string][]][] = [
+  ['Work', [['chat', '/chat', 'Assistant'], ['suites', '/', 'Suites'], ['runs', '/runs', 'Runs']]],
+  ['Setup', [['ai', '/settings/ai', 'AI keys']]],
+  ['Help', [['guide', '/guide', 'Guide'], ['help', '/help', 'Full reference']]],
+];
+
 export function layout(title: string, body: string, opts: { refresh?: boolean; section?: Section } = {}): string {
-  const nav = ([['suites', '/', 'Suites'], ['runs', '/runs', 'Runs'], ['chat', '/chat', 'Assistant'], ['ai', '/settings/ai', 'AI keys'], ['guide', '/guide', 'Guide']] as const)
-    .map(([key, href, label]) => `<a href="${href}"${opts.section === key ? ' aria-current="page"' : ''}>${label}</a>`)
-    .join('');
+  const nav = NAV.map(([group, items]) => `<div class="nav-group"><p class="nav-label">${group}</p>${items
+    .map(([key, href, label]) => `<a href="${href}"${opts.section === key ? ' aria-current="page"' : ''}>${icon(key)}<span>${label}</span></a>`)
+    .join('')}</div>`).join('');
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · SL QA</title>
@@ -37,8 +57,19 @@ export function layout(title: string, body: string, opts: { refresh?: boolean; s
 ${opts.refresh ? '<script>setTimeout(() => location.reload(), 2000)</script>' : ''}
 </head><body>
 <a class="skip" href="#main">Skip to content</a>
-<header><a class="brand" href="/">SL QA</a><nav>${nav}</nav></header>
+<div class="shell">
+<aside class="sidebar">
+  <div class="side-top">
+    <a class="brand" href="/chat"><img class="logo" src="${FAVICON}" alt="" width="26" height="26"><span>SL QA</span></a>
+    <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Show menu" aria-controls="side-nav">
+    <label for="nav-toggle" class="nav-burger" aria-hidden="true">${icon('menu')}</label>
+  </div>
+  <nav id="side-nav" class="side-nav" aria-label="Main">${nav}
+    <div class="side-foot"><span class="nav-label">Target site</span><a href="https://slshop.cloud/dashboard" target="_blank" rel="noreferrer">slshop.cloud ${icon('ext', 'ico sm')}</a></div>
+  </nav>
+</aside>
 <main id="main">${body}</main>
+</div>
 <script>${JS}</script>
 </body></html>`;
 }
@@ -99,16 +130,17 @@ export function homePage(all: Suite[], lastRuns: Map<string, Run>, error?: strin
     `<label class="choice"><input type="radio" name="kind" value="${kind}"${f.kind === kind ? ' checked' : ''}><span><b>${label}</b><span class="hint">${hint}</span></span></label>`;
   return layout(
     'Suites',
-    `<div class="page-head"><div><h1>Test suites</h1><p class="sub">A suite is one list of cases (test cases or bugs) for the bot to check on slshop.cloud.</p></div>
-      <div class="toolbar"><a class="button primary" href="#add">＋ New suite</a></div></div>
-    <section class="card" id="assistant">
-      <h2>💬 Ask the Assistant</h2>
-      <p class="hint">Questions about a dashboard page, or test cases written for you (saved as a suite in one click). It answers from the site map, your suites and, if you give it, the app's GitHub repo.</p>
+    `<section class="card home-assistant" id="assistant">
+      <h2>${icon('chat')} Start with the Assistant</h2>
+      <p class="hint">Ask about slshop.cloud, have it hunt for bugs on a page in a real browser, or get test cases written for you. Bugs and cases save as a suite in one click.</p>
+      <ul class="purposes"><li>Ask about slshop.cloud</li><li>Find a bug</li><li>Generate test cases</li></ul>
       <form method="post" action="/chat" class="toolbar">
-        <input name="message" required maxlength="4000" placeholder="Generate test cases for the POS page" aria-label="Message for the Assistant" style="flex:1;min-width:220px">
+        <input name="message" required maxlength="4000" placeholder="Find bugs on the Orders page" aria-label="Message for the Assistant" style="flex:1;min-width:220px">
         <button class="primary">Ask</button><a class="button" href="/chat">Open chats</a>
       </form>
     </section>
+    <div class="page-head" style="margin-top:32px"><div><h1>Test suites</h1><p class="sub">A suite is one list of cases (test cases or bugs) for the bot to check on slshop.cloud.</p></div>
+      <div class="toolbar"><a class="button primary" href="#add">＋ New suite</a></div></div>
     ${all.length ? wrap(`<table><thead><tr><th>Suite</th><th class="num">Cases</th><th>Understood by the bot</th><th>Last run</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)
       : `<div class="empty"><b>No suites yet.</b><br>Add your first list of cases below: a Google Sheet, a file, or type them in by hand.<br><a href="/guide">New here? Read the Guide</a> · <a href="/example">Try the example suite</a> · <a href="/help/sample.csv">Download a sample sheet</a></div>`}
     <details class="card" id="add"${error || typed ? ' open' : ''}>
@@ -323,15 +355,19 @@ export function aiKeysPage(rows: ReturnType<typeof import('../engine/ai/provider
   const row = (r: (typeof rows)[number]) => `<tr>
     <td><b>${esc(r.provider.name)}</b><div class="sub">${r.provider.tier}</div></td>
     <td><code>${esc(r.provider.keyEnv)}</code>${r.keys > 1 ? `<div class="sub">${r.keys} keys</div>` : ''}</td>
-    <td>${r.set ? '<span class="ok">✓ set</span>' : '<span class="sub">not set</span>'}</td>
+    <td class="nowrap">${r.set ? '<span class="ok">✓ set</span>' : '<span class="sub">not set</span>'}</td>
     <td><code>${esc(r.model)}</code><div class="sub">change with <code>${esc(r.provider.modelEnv)}</code></div></td>
     <td>${r.ok || r.failed ? `${r.ok} ok · ${r.failed} failed` : '<span class="sub">—</span>'}${r.coolingUntil ? `<div class="warn">skipped until ${esc(r.coolingUntil)} (${esc(r.coolReason ?? '')})</div>` : ''}${r.lastError ? `<div class="sub" title="${esc(r.lastError)}">last error: ${esc(r.lastError.slice(25, 120))}</div>` : ''}</td>
-    <td><a href="${esc(r.provider.signup)}" target="_blank" rel="noreferrer">Get a key ↗</a></td></tr>`;
+    <td class="nowrap"><a href="${esc(r.provider.signup)}" target="_blank" rel="noreferrer">Get a key ↗</a></td></tr>`;
   return layout(
     'AI keys',
-    `<p class="crumbs"><a href="/">Suites</a> /</p>
-    <h1>AI keys</h1>
-    <p class="sub">SL QA asks the AI only when its own rules fall short: a step or expected result it does not understand, or a step that fails on the page (it then suggests a corrected step). Pass and Fail are always decided by the bot's own checks. It tries <b>Claude</b> (the primary provider) first, then the others top to bottom: Gemini, Grok and the rest. A provider that fails (bad key, quota used up, error) is skipped for a while and the next one is tried. Paid fallbacks are used at most <b>${paid.limit}</b> times a day; Claude is not counted against that limit.</p>
+    `<div class="page-head"><div><h1>AI keys</h1><p class="sub">Which AI providers SL QA can use, and how they are doing today. Pass and Fail are always decided by the bot's own checks; the AI only helps.</p></div></div>
+    <div class="card"><ul style="margin:0;padding-left:20px">
+      <li><b>Gemini</b> (free): the default. One free key is enough for the Assistant, AI rewrites and live help during runs.</li>
+      <li><b>OpenAI</b> (paid): used by <b>Super QA</b> and by the Assistant's <b>Find a bug</b> triage, which need a stronger model.</li>
+      <li><b>Claude</b> (optional): a strong model for live help and Super QA when it is set.</li>
+    </ul>
+    <p class="hint" style="margin-top:12px">Providers are tried top to bottom in the table. One that fails (bad key, quota used up, error) is skipped for a while and the next one is tried. Paid fallbacks are used at most <b>${paid.limit}</b> times a day.</p></div>
     ${flash ? `<div class="alert info" role="status">${esc(flash)}</div>` : ''}
     <p>Paid calls today: <b>${paid.used} of ${paid.limit}</b> <span class="sub">(change with <code>AI_PAID_DAILY_LIMIT</code>; 0 = never use paid keys)</span></p>
     ${wrap(`<table><thead><tr><th>Provider</th><th>.env name</th><th>Key</th><th>Model</th><th>Today</th><th></th></tr></thead><tbody>${rows.map(row).join('')}</tbody></table>`)}
@@ -372,7 +408,7 @@ export function runsTable(list: Run[]): string {
 }
 
 export function runsPage(list: Run[]): string {
-  return layout('Runs', `<h1>Runs</h1><p class="sub">Every time you press Run, the results land here. Newest first.</p>
+  return layout('Runs', `<div class="page-head"><div><h1>Runs</h1><p class="sub">Every time you press Run, the results land here. Newest first.</p></div></div>
     ${list.length ? runsTable(list) : '<div class="empty"><b>No runs yet.</b><br>Open a <a href="/">suite</a>, tick the cases and click Run.</div>'}`, { section: 'runs' });
 }
 
@@ -412,7 +448,7 @@ export function runPage(run: Run, earlier: Run[] = []): string {
       .map((r) => {
         const f = r.checks.find((c) => c.state === 'fail') ?? r.checks.find((c) => c.state === 'review');
         const finding = f ? `${f.label}: ${f.actual}` : r.verdict === 'Blocked' ? r.notes.at(-1) ?? '' : r.error ?? '';
-        return `<tr><td><a href="#${esc(r.tc.id)}">${esc(r.tc.id)}</a></td><td>${esc(r.tc.title)}</td><td>${verdictBadge(r.verdict)}${aiOnly(r) ? ' <span class="tag ai">AI-checked</span>' : ''}</td><td class="sub">${esc(finding.slice(0, 180))}</td></tr>`;
+        return `<tr><td class="nowrap"><a href="#${esc(r.tc.id)}">${esc(r.tc.id)}</a></td><td>${esc(r.tc.title)}</td><td>${verdictBadge(r.verdict)}${aiOnly(r) ? ' <span class="tag ai">AI-checked</span>' : ''}</td><td class="sub">${esc(finding.slice(0, 180))}</td></tr>`;
       })
       .join('')}</tbody></table>`) : ''}
     ${run.results.map((r) => caseDetail(run, r)).join('')}`,
@@ -593,7 +629,7 @@ export function helpPage(): string {
   return layout(
     'How to use',
     `<article class="help">
-    <h1>How to use SL QA</h1>
+    <div class="page-head"><div><h1>Full reference</h1><p class="sub">Everything SL QA does, in detail. For a one-minute overview, see the <a href="/guide">Guide</a>.</p></div></div>
     <p class="lead">SL QA is a robot tester for the slshop.cloud dashboard. You give it a list of things that <b>should</b> be true, such as <i>"the Add Product button is visible"</i>. It opens each page in a real browser, logged in as the store owner, and checks them one by one. Then it writes a report: what works, what doesn't, and where the problem is.</p>
     <p>You don't need to write any code. If you can fill in a spreadsheet, you can use it. It follows fixed rules first, so the same list gives the same answer every time. Only when a sentence is outside its rules, or a step fails on the page, does it ask an AI for help (if an AI key is set; see <a href="#ai">AI help</a>). Pass and Fail always come from the bot's own checks.</p>
 
@@ -687,7 +723,7 @@ export function helpPage(): string {
 
     <nav class="toc" aria-label="On this page"><b>On this page</b>
       <a href="#example"><b>Try it: a worked example</b></a><a href="#sheet">1. Prepare your list</a><a href="#add">2. Add a suite</a><a href="#check">3. Check the bot understood it</a>
-      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#site"><b>Check the whole dashboard</b></a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#ai"><b>AI help for anything else</b></a><a href="#assistant"><b>The Assistant</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a>
+      <a href="#run">4. Run the checks</a><a href="#report">5. Read the results</a><a href="#manage">Add, edit or delete cases</a><a href="#paste"><b>Paste a bug report from Jira</b></a><a href="#form">Testing the Add Product form</a><a href="#assistant"><b>The Assistant</b></a><a href="#ai"><b>AI help for anything else</b></a><a href="#writing">Writing sentences the bot understands</a><a href="#faq">Questions and problems</a><a href="#words">Words used in the app</a>
     </nav>
 
     <section id="sheet"><h2><span class="num">1</span> Prepare your list</h2>
@@ -770,9 +806,8 @@ export function helpPage(): string {
       </ul>
     </section>
 
-    <section id="site"><h2>Check the whole dashboard (no cases to write)</h2>
-      <p>On <a href="/">Suites</a>, <b>🔎 Check the whole dashboard</b> makes a suite with one case per dashboard page (about 140). Each case checks that the page loads without errors, shows no NaN/undefined values and shows its heading, then tries the page's safe controls: the next page of a list, status tabs, the Filter panel and the search box. It never creates, saves, deletes, imports or sends anything, and live AI help is off for these runs.</p>
-      <p>The page list comes from a <b>site map</b> made by a read-only crawler (about 5 minutes; labels only, no store data). It is crawled again when it is over 7 days old, or when you click <b>↻ Re-crawl</b>. The same map lets steps use any page name, such as <code>Open Products › Categories</code> or <code>Go to Settings &gt; Tax</code>.</p>
+    <section id="site"><h2>The site map</h2>
+      <p>SL QA keeps a <b>site map</b> of the dashboard, made by a read-only crawler (labels only, no store data). The Assistant answers from it, and steps can use any page name from it, such as <code>Open Products › Categories</code> or <code>Go to Settings &gt; Tax</code>. It is crawled again when it is over 7 days old. To look for bugs on a page without writing cases, ask the Assistant to <b>Find a bug</b> (see <a href="#assistant">The Assistant</a>).</p>
     </section>
 
     <section id="manage"><h2>Add, edit or delete cases</h2>
@@ -861,31 +896,27 @@ export function helpPage(): string {
       <p>The bot has built-in rules for the pages it knows well. For everything else it gets help from an AI, <b>automatically, during the run</b>:</p>
       <ol>
         <li><b>A sentence it doesn't understand:</b> the AI reads it together with the case's title, preconditions, test data and <i>what is on the screen right now</i>, and turns it into simple steps. The bot does them straight away.</li>
-        <li><b>A step that fails on the page</b> (button not found, dialog not open, renamed label): the AI looks at the page (and a screenshot, when the provider can read images) and suggests a corrected step, and the bot tries it. Claude gets 1 try for a simple step and 2 for a complex one (inside a row or dialog, a dropdown, an upload, or several matching buttons). If those fail, one more try goes to the fallbacks (Gemini, then Grok). The report keeps the original problem visible as "not checked", so a renamed button is never hidden.</li>
+        <li><b>A step that fails on the page</b> (button not found, dialog not open, renamed label): the AI looks at the page (and a screenshot, when the provider can read images) and suggests a corrected step, and the bot tries it. The first provider gets 1 try for a simple step and 2 for a complex one (inside a row or dialog, a dropdown, an upload, or several matching buttons). If those fail, one more try goes to the next provider. The report keeps the original problem visible as "not checked", so a renamed button is never hidden.</li>
         <li><b>An expected result it doesn't understand:</b> the AI turns it into checks the bot can measure (text shown, button visible, a number next to a label). It opens the tab the check is about first. For "should increase by 5" or "should change", it remembers the value <i>before</i> the steps and compares afterwards.</li>
       </ol>
       <p>In the results, these steps carry an <span class="tag ai">AI</span> badge, and the case says <span class="tag ai">AI helped</span>. Pass and Fail are always decided by the bot's own checks, never by the AI.</p>
       <div class="tip"><b>Make it faster and repeatable.</b> Everything the AI worked out is saved as a suggestion. Open <b>Review rewrites</b> on the suite, check it, and click <b>Approve</b>. From then on the bot uses it directly, with no AI call, and gets the same result every time.</div>
       <p><b>Safety.</b> When AI-driven steps would change a product (price, stock, status, channels), the bot first makes its own test product, <code>BTB &lt;case&gt; AI test item</code>, uses only that, and archives it afterwards. Real products are not touched. The code itself also refuses risky clicks from AI steps (Delete, Archive, Refund, Place order, Log out, Generate, Bulk actions…) unless they are on a <code>BTB</code> test record; refused steps show as skipped. The AI is not used at all when no AI key is set.</p>
-      <p class="sub">Limits per case: at most 12 AI calls for steps and 12 for checks (<code>AI_MAX_CALLS_PER_CASE</code>), and at most 240 seconds of AI time (<code>AI_MAX_SECONDS_PER_CASE</code>). <code>AI_REPAIR_TRIES</code> caps Claude's repair tries (0 = fallback try only) and <code>AI_VISION=off</code> stops sending screenshots. To switch live help off but keep the review page, set <code>AI_LIVE=off</code>.</p>
+      <p class="sub">Limits per case: at most 12 AI calls for steps and 12 for checks (<code>AI_MAX_CALLS_PER_CASE</code>), and at most 240 seconds of AI time (<code>AI_MAX_SECONDS_PER_CASE</code>). <code>AI_REPAIR_TRIES</code> caps the repair tries (0 = fallback try only) and <code>AI_VISION=off</code> stops sending screenshots. To switch live help off but keep the review page, set <code>AI_LIVE=off</code>.</p>
       <h3>The step language</h3>
       ${ACTION_HELP}
-      <h3 id="ai-keys">AI keys: Claude first, then Gemini and Grok</h3>
+      <h3 id="ai-keys">AI keys: Gemini free by default, OpenAI for Super QA and bug triage, Claude optional</h3>
       <p>Put the keys in the <code>.env</code> file (next to <code>package.json</code>), then restart SL QA. The <a href="/settings/ai">AI keys</a> page shows which are set and how they are doing. SL QA tries the providers in this order and moves on when one fails (bad key, quota used up, server error):</p>
-      <table class="stack-sm"><thead><tr><th>Order</th><th>.env line</th><th>Where to get it</th><th>Free limits (roughly)</th></tr></thead><tbody>
-        <tr><td>1 · primary</td><td><code>ANTHROPIC_API_KEY=…</code></td><td>console.anthropic.com → <b>API Keys</b> (needs billing; Claude Sonnet)</td><td>pay per use, not capped</td></tr>
-        <tr><td>2 · free</td><td><code>GEMINI_API_KEY=…</code></td><td>Google AI Studio → <b>Get API key</b> (aistudio.google.com/apikey)</td><td>~15 requests/min, ~500/day</td></tr>
-        <tr><td>3 · paid</td><td><code>XAI_API_KEY=…</code></td><td>console.x.ai → <b>API Keys</b> (Grok)</td><td>pay per use</td></tr>
-        <tr><td>4 · free</td><td><code>GROQ_API_KEY=…</code></td><td>console.groq.com → <b>API Keys</b></td><td>30/min, 1,000/day</td></tr>
-        <tr><td>5 · free</td><td><code>OPENROUTER_API_KEY=…</code></td><td>openrouter.ai → <b>Settings → Keys</b></td><td>20/min, 50/day (only ":free" models are used)</td></tr>
-        <tr><td>6 · free</td><td><code>MISTRAL_API_KEY=…</code></td><td>console.mistral.ai → <b>API Keys</b></td><td>monthly cap, shown in their console</td></tr>
-        <tr><td>7 · paid</td><td><code>OPENAI_API_KEY=…</code></td><td>platform.openai.com → <b>API keys</b> (needs billing)</td><td>pay per use</td></tr>
-        <tr><td>8 · paid</td><td><code>CEREBRAS_API_KEY=…</code></td><td>cloud.cerebras.ai (one-time $5 trial, card needed)</td><td>pay per use</td></tr>
+      <table class="stack-sm"><thead><tr><th>Key</th><th>.env line</th><th>Where to get it</th><th>Used for</th></tr></thead><tbody>
+        <tr><td>Gemini · free · default</td><td><code>GEMINI_API_KEY=…</code></td><td>Google AI Studio → <b>Get API key</b> (aistudio.google.com/apikey)</td><td>The Assistant, AI rewrites and live help. ~15 requests/min, ~500/day.</td></tr>
+        <tr><td>OpenAI · paid</td><td><code>OPENAI_API_KEY=…</code></td><td>platform.openai.com → <b>API keys</b> (needs billing)</td><td><b>Super QA</b> and <b>Find a bug</b> triage (model: <code>SUPERQA_OPENAI_MODEL</code>).</td></tr>
+        <tr><td>Claude · optional</td><td><code>ANTHROPIC_API_KEY=…</code></td><td>console.anthropic.com → <b>API Keys</b> (needs billing)</td><td>A strong model for live help, and Super QA when OpenAI is not set.</td></tr>
+        <tr><td>Other fallbacks</td><td><code>GROQ_API_KEY</code>, <code>OPENROUTER_API_KEY</code>, <code>MISTRAL_API_KEY</code> (free); <code>XAI_API_KEY</code>, <code>CEREBRAS_API_KEY</code> (paid)</td><td>Each provider's console → <b>API Keys</b></td><td>Tried when the ones above fail or hit their limits.</td></tr>
       </tbody></table>
       <ul>
-        <li><b>Claude is the main AI.</b> Add a Gemini key (free) and a Grok key as fallbacks, so a step still gets help when Claude is down or its fix fails.</li>
-        <li><b>Paid fallbacks are capped.</b> Grok, OpenAI and Cerebras are used at most <code>AI_PAID_DAILY_LIMIT</code> times a day (default 20; set 0 to never use them). Claude is not counted.</li>
-        <li><b>Change a model:</b> <code>GEMINI_MODEL</code>, <code>GROQ_MODEL</code>, <code>OPENROUTER_MODEL</code>, <code>MISTRAL_MODEL</code>, <code>ANTHROPIC_MODEL</code> (default <code>claude-sonnet-5-5</code>), <code>XAI_MODEL</code>, <code>OPENAI_MODEL</code>, <code>CEREBRAS_MODEL</code>.</li>
+        <li><b>Start with a free Gemini key.</b> Add an OpenAI key when you want Super QA and bug triage. The <a href="/settings/ai">AI keys</a> page shows the exact order SL QA tries them in.</li>
+        <li><b>Paid fallbacks are capped.</b> They are used at most <code>AI_PAID_DAILY_LIMIT</code> times a day for live help (default 20; set 0 to never use them). Super QA is not counted.</li>
+        <li><b>Change a model:</b> <code>GEMINI_MODEL</code>, <code>OPENAI_MODEL</code>, <code>ANTHROPIC_MODEL</code>, <code>GROQ_MODEL</code>, <code>OPENROUTER_MODEL</code>, <code>MISTRAL_MODEL</code>, <code>XAI_MODEL</code>, <code>CEREBRAS_MODEL</code>.</li>
         <li><b>Several keys for one provider:</b> separate them with commas. Note that Gemini limits are per Google Cloud project, so two keys from the same project don't add more.</li>
       </ul>
       <p class="sub">Without any key, everything else works as before (no AI). The sentences, the case title and the page path are sent to the provider; logins and store data are not. Free tiers may use prompts to improve their models (Google, and Mistral unless you opt out in its Admin → Privacy).</p>
@@ -906,14 +937,15 @@ export function helpPage(): string {
     </section>
 
     <section id="assistant"><h2>The Assistant</h2>
-      <p><a href="/chat">Assistant</a> is a chat about the slshop.cloud dashboard. It answers from what SL QA already knows: the crawled site map (pages, tabs, buttons, fields, columns) and the titles of your suites' cases. When the answer isn't there, it says so instead of guessing. It needs an AI key (see <a href="/settings/ai">AI keys</a>).</p>
-      <ul>
-        <li><b>Ask about a page:</b> <i>What can I filter on the Orders page?</i></li>
-        <li><b>Get test cases:</b> <i>Generate test cases for the POS page.</i> The answer includes a table with the sheet's columns (TC ID, URL, Test Case, Priority, Preconditions, Test Steps, Test Data, Expected Result). Click <b>Save as new suite</b> to add them as a suite, or <b>Download CSV</b> to put them in a sheet. Check <b>How the bot reads it</b> before running them.</li>
-        <li><b>Code context:</b> paste a GitHub link (<code>https://github.com/owner/repo</code>, or <code>…/tree/&lt;branch&gt;/&lt;folder&gt;</code>) and it also reads the most relevant source files: routes, pages, components, validation, tests. The files it used are listed under the answer. A private repo, or many questions an hour, needs <code>GITHUB_TOKEN</code> in <code>.env</code>. Only github.com links are accepted.</li>
-        <li><b>Use Super QA:</b> under any proposed cases (also after you edit them). SL QA opens their pages in a logged-in browser, looks at a real record and its Edit page when the steps need one, opens the dropdowns the cases name, and gives that (with screenshots) to a stronger model (OpenAI, then Claude). The corrected cases appear as a new answer with a <b>Super QA</b> badge and a list of what it checked; the original cases stay as they were. It takes 30–90 seconds, runs one at a time, only looks (never saves or deletes), and needs <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>.</li>
-      </ul>
-      <p class="sub">The Assistant never runs anything and never sees your login or keys. Chats are kept under <code>data/chats/</code>; delete them from the chat list.</p>
+      <p><a href="/chat">Assistant</a> is the main way in. It is a chat about the slshop.cloud dashboard with three jobs. It answers from what SL QA already knows: the crawled site map (pages, tabs, buttons, fields, columns), your suites and, if you give it, the app's GitHub repo. When the answer isn't there, it says so instead of guessing. It needs an AI key (see <a href="/settings/ai">AI keys</a>).</p>
+      <ol>
+        <li><b>Ask about slshop.cloud:</b> <i>What can I filter on the Orders page?</i></li>
+        <li><b>Find a bug:</b> pick a page, module or feature (<i>Find bugs on the Eye Lens category</i>). SL QA opens it in a real, logged-in browser with DevTools capture (console errors, failed requests, slow calls), and tries its tabs, filters, sorting, search and paging. It only looks: it never saves, deletes or sends anything. Then it reports only the bugs it has evidence for, each with what it did, what happened, the captured errors and a screenshot. Click <b>Save as new suite</b> to turn the bugs into cases you can re-run after a fix.</li>
+        <li><b>Generate test cases:</b> <i>Generate test cases for the POS page.</i> The answer includes a table with the sheet's columns (TC ID, URL, Test Case, Priority, Preconditions, Test Steps, Test Data, Expected Result). Edit, delete or add cases, run <b>Super QA</b>, then <b>Save as new suite</b> or <b>Download CSV</b>. Check <b>How the bot reads it</b> before running them.</li>
+      </ol>
+      <p><b>Super QA</b> is under any proposed cases (also after you edit them). SL QA opens their pages in a logged-in browser, looks at a real record and its Edit page when the steps need one, opens the dropdowns the cases name, and gives that (with screenshots) to a stronger model (OpenAI, then Claude). The corrected cases appear as a new answer with a <b>Super QA</b> badge and a list of what it checked; the original cases stay as they were. It takes 30–90 seconds, runs one at a time, only looks (never saves or deletes), and needs <code>OPENAI_API_KEY</code> or <code>ANTHROPIC_API_KEY</code>.</p>
+      <p><b>Code context:</b> paste a GitHub link (<code>https://github.com/owner/repo</code>, or <code>…/tree/&lt;branch&gt;/&lt;folder&gt;</code>) and it also reads the most relevant source files: routes, pages, components, validation, tests. The files it used are listed under the answer. A private repo, or many questions an hour, needs <code>GITHUB_TOKEN</code> in <code>.env</code>. Only github.com links are accepted.</p>
+      <p class="sub">The Assistant never sees your login or keys. Chats are kept under <code>data/chats/</code>; delete them from the chat list.</p>
     </section>
 
     <section id="faq"><h2>Questions and problems</h2>
@@ -976,7 +1008,7 @@ export function notFound(what = 'page'): string {
     case: 'It may have been deleted, or the sheet was re-read without it.',
   };
   return layout('Not found', `<div class="empty"><h1>That ${esc(what)} doesn't exist</h1><p>${hint[what] ?? 'The link may be mistyped or out of date.'}</p>
-    <div class="toolbar center"><a class="button primary" href="/">Go to Suites</a><a class="button" href="/runs">Runs</a><a class="button" href="/guide">Guide</a></div></div>`);
+    <div class="toolbar center"><a class="button primary" href="/chat">Open Assistant</a><a class="button" href="/">Suites</a><a class="button" href="/runs">Runs</a><a class="button" href="/guide">Guide</a></div></div>`);
 }
 
 const JS = `
@@ -985,121 +1017,229 @@ function copyNext(btn) {
 }`;
 
 const CSS = `
-:root { color-scheme:light dark; --bg:#f7f7f8; --card:#fff; --text:#1d1d22; --muted:#62626c; --line:#e4e4e8; --brand:#d6243a; --link:#1d4ed8;
-  --pass:#1f8a4c; --fail:#c8293b; --partial:#a8690f; --blocked:#6b6b76; --error:#7c3aed; --running:#2563eb; --focus:#2563eb; }
-@media (prefers-color-scheme: dark) { :root { --bg:#141417; --card:#1d1d22; --text:#ececf1; --muted:#a3a3ae; --line:#33333b; --link:#8fb0ff;
-  --pass:#3fb873; --fail:#ff6b7a; --partial:#e0a33c; --running:#6a96ff; --focus:#8fb0ff; } }
-* { box-sizing: border-box; }
-body { margin:0; font:14px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--text); }
-header { display:flex; gap:24px; align-items:center; padding:12px 24px; background:var(--card); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
-header .brand { font-weight:700; color:var(--brand); text-decoration:none; font-size:16px; }
-header nav a { margin-right:16px; color:var(--text); text-decoration:none; }
-main { max-width:1200px; margin:0 auto; padding:24px; }
-h1 { font-size:22px; margin:0 0 6px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; } h2 { font-size:17px; margin:28px 0 10px; } h3 { font-size:15px; margin:0 0 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-a { color:var(--link); }
-:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
-.skip { position:absolute; left:-9999px; } .skip:focus { left:12px; top:8px; z-index:10; background:var(--card); padding:6px 10px; border-radius:6px; }
-header nav a[aria-current] { color:var(--brand); font-weight:600; }
-.visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; } th:has(> .visually-hidden) { position:relative; }
-.table-wrap { position:relative; }
-.page-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
-.table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:8px; } .table-wrap > table { min-width:560px; }
-.nowrap { white-space:nowrap; } td.num, th.num { text-align:right; }
-.counts { display:flex; gap:2px 8px; flex-wrap:wrap; margin-top:2px; } .counts .count { white-space:nowrap; margin:0; } .counts.big .count { font-size:14px; }
-fieldset.choices { border:0; padding:0; margin:0; display:grid; gap:8px; } fieldset.choices legend { font-weight:500; margin-bottom:6px; padding:0; }
-fieldset.choices label.choice { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:8px; cursor:pointer; font-weight:400; }
-label.choice:has(input:checked) { border-color:var(--brand); background:color-mix(in srgb, var(--brand) 6%, var(--card)); } label.choice span { display:grid; gap:2px; } label.choice input { margin-top:3px; }
-.inline-label { display:flex; gap:6px; align-items:center; color:var(--muted); font-size:13px; min-width:0; } .inline-label select { max-width:min(320px, 60vw); }
-#run { flex-wrap:wrap; max-width:100%; }
-.selection-bar { display:flex; gap:12px; align-items:center; margin:0 0 8px; min-height:24px; }
-button:disabled { opacity:.45; cursor:not-allowed; }
-.spacer { flex:1; }
-.toolbar.center { justify-content:center; margin-top:14px; }
-details.settings > summary { color:var(--text); font-size:14px; } details.settings[open] > summary { margin-bottom:12px; }
-.danger-zone { margin-top:18px; padding:12px 14px; border:1px solid color-mix(in srgb, var(--fail) 40%, var(--line)); border-radius:8px; display:grid; gap:6px; }
-.danger-zone h3 { margin:0 0 4px; color:var(--fail); } .danger-zone .hint { margin:0 0 6px; }
-input[aria-invalid=true], textarea[aria-invalid=true] { border-color:var(--fail); box-shadow:0 0 0 2px color-mix(in srgb, var(--fail) 25%, transparent); }
-[hidden] { display:none !important; }
-.sub { color:var(--muted); font-size:12.5px; }
-.crumbs { margin:0 0 4px; color:var(--muted); }
-table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
-th { font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); background:var(--bg); }
-tr:last-child td { border-bottom:0; }
-.card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 20px; margin:20px 0; }
-.stack { display:grid; gap:12px; max-width:640px; } .stack label { display:grid; gap:4px; font-weight:500; }
-input, select, button, .button { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); }
-button, .button { cursor:pointer; font-weight:500; text-decoration:none; display:inline-block; } button:hover, .button:hover { border-color:var(--muted); }
-button.primary { background:var(--brand); border-color:var(--brand); color:#fff; } button.danger { color:var(--fail); }
-.or { color:var(--muted); font-size:12px; text-align:center; } .hint { color:var(--muted); font-size:12.5px; margin:0; }
-.toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:16px 0; } form.inline { display:flex; gap:6px; align-items:center; margin:0; }
-.badge { display:inline-flex; align-items:center; gap:6px; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:600; color:#fff; background:var(--muted); white-space:nowrap; }
-.badge.review { background:#b45309; } .count.review { color:#b45309; } tr.review td { color:#92400e; }
-.badge.pass { background:var(--pass); } .badge.fail { background:var(--fail); } .badge.partial { background:var(--partial); } .badge.blocked { background:var(--blocked); } .badge.error { background:var(--error); } .badge.running { background:var(--running); } .badge.muted { background:var(--muted); }
-.count { font-size:12px; font-weight:600; margin-right:6px; } .count.pass { color:var(--pass); } .count.fail { color:var(--fail); } .count.partial { color:var(--partial); } .count.blocked { color:var(--blocked); } .count.error { color:var(--error); }
-.alert { background:color-mix(in srgb, var(--fail) 12%, var(--card)); border:1px solid color-mix(in srgb, var(--fail) 40%, var(--line)); padding:10px 14px; border-radius:6px; margin:12px 0; }
-.alert.info { background:color-mix(in srgb, var(--running) 10%, var(--card)); border-color:color-mix(in srgb, var(--running) 35%, var(--line)); }
-.empty { color:var(--muted); padding:24px; text-align:center; background:var(--card); border:1px dashed var(--line); border-radius:8px; }
-.meter { width:120px; height:6px; background:var(--line); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:6px; } .meter span { display:block; height:100%; background:var(--pass); }
-.progress { height:8px; background:var(--line); border-radius:4px; overflow:hidden; } .progress span { display:block; height:100%; background:var(--running); transition:width .4s; }
-.live p { margin:10px 0; }
-.spin { width:10px; height:10px; border:2px solid #fff; border-right-color:transparent; border-radius:50%; display:inline-block; animation:spin .8s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
-.ok { color:var(--pass); } .warn { color:var(--partial); }
-details { margin:6px 0; } summary { cursor:pointer; color:var(--muted); font-size:12.5px; }
-.preview { font-size:12.5px; padding:8px 0; } .preview ol, .preview ul { margin:4px 0 8px; padding-left:18px; } .rule { color:var(--muted); font-size:11px; margin-left:4px; }
-.issues { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 12px 12px 32px; } .issues li { margin:6px 0; }
-.actual { color:var(--fail); } .cause { color:var(--muted); font-size:12.5px; margin-top:2px; }
-.case { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px 20px; margin:16px 0; scroll-margin-top:70px; }
-.checks { table-layout:fixed; width:100%; } .checks td { overflow-wrap:anywhere; } .checks td:first-child { width:24px; font-weight:700; } .checks tr.pass td:first-child { color:var(--pass); } .checks tr.fail td:first-child { color:var(--fail); } .checks tr.skip td:first-child { color:var(--muted); } .checks tr.skip { color:var(--muted); }
-.note { color:var(--muted); font-size:12.5px; margin:6px 0; border-left:3px solid var(--line); padding-left:8px; }
-.steps { font-size:12.5px; } .steps li.failed, .steps li.unmatched { color:var(--fail); } .steps li.skipped { color:var(--muted); }
-.shots { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; } .shots a { display:grid; gap:2px; width:200px; text-decoration:none; color:var(--muted); font-size:11.5px; } .shots img { width:200px; border:1px solid var(--line); border-radius:4px; }
-pre { white-space:pre-wrap; font-size:12px; background:var(--bg); padding:10px; border-radius:6px; margin:6px 0; }
-.prompt { position:relative; } .prompt button { position:absolute; right:8px; top:8px; font-size:12px; padding:3px 8px; }
-.tag { display:inline-block; font-size:11px; padding:0 6px; border-radius:4px; background:var(--bg); color:var(--muted); border:1px solid var(--line); margin-top:2px; }
-.row-actions { white-space:nowrap; font-size:12.5px; } .row-actions form { display:inline; } button.link { border:0; background:none; padding:0 0 0 10px; color:var(--fail); font-size:12.5px; }
-.toolbar.bulk { margin:4px 0 10px; } label.check { display:flex; gap:8px; align-items:center; font-weight:400; }
-textarea { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--text); resize:vertical; }
-pre.jira { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:12.5px; max-width:100%; overflow-wrap:anywhere; }
-.ai-banner { display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap; border-color:color-mix(in srgb, var(--link) 35%, var(--line)); }
-.ai-box { margin:6px 0 10px; padding:8px 12px; border-radius:8px; background:color-mix(in srgb, var(--link) 8%, transparent); border:1px solid color-mix(in srgb, var(--link) 25%, var(--line)); }
-.rewrite { max-width:860px; } .rewrite .source { font-size:15px; margin:4px 0; } .rewrite textarea { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; }
-.rewrite-head { display:flex; gap:10px; align-items:center; flex-wrap:wrap; } .tag.ai { background:color-mix(in srgb, var(--link) 15%, transparent); }
-.issue-form { max-width:760px; } .issue-form details.paste { border:1px dashed var(--line); border-radius:8px; padding:10px 12px; background:var(--bg); } .issue-form details.paste summary { cursor:pointer; } .issue-form .hint { font-weight:400; } .req { color:var(--fail); font-size:11px; font-weight:500; } .opt { color:var(--muted); font-size:11px; font-weight:400; }
-.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } }
-a.button.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
-.report { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 28px 24px; overflow-wrap:anywhere; }
-.report [id] { scroll-margin-top:70px; }
-.report th { white-space:nowrap; } .report td:first-child { white-space:nowrap; } .report td:nth-child(3), .report td:nth-child(4) { white-space:nowrap; } .report td:last-child { white-space:normal; min-width:240px; } .report img { max-width:100%; height:auto; border:1px solid var(--line); border-radius:6px; margin:6px 0; }
-.report table { display:block; overflow-x:auto; } .report td code, .report li code { white-space:normal; }
-.report details { border:1px solid var(--line); border-radius:6px; padding:6px 10px; margin:8px 0; } .report details summary { color:var(--text); }
-.report .finding { border-left:3px solid var(--fail); padding:2px 0 2px 14px; margin:14px 0; }
-@media print { header, .toolbar, .crumbs, .skip { display:none !important; } .report { border:0; padding:0; } body { background:#fff; } } .report h3 { display:block; margin-top:22px; } .report table { margin:8px 0 16px; } .report li { margin:3px 0; } .report blockquote { color:var(--muted); border-left:3px solid var(--line); margin:6px 0; padding-left:10px; }
-.help { max-width:860px; } .help .lead { font-size:15.5px; } .help section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:4px 22px 16px; margin:18px 0; scroll-margin-top:70px; }
-.help h2 { display:flex; align-items:center; gap:10px; } .help .num { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--brand); color:#fff; font-size:14px; }
-.help li { margin:5px 0; } .help table { margin:10px 0; } .help dt { font-weight:600; margin-top:12px; } .help dd { margin:4px 0 0 0; color:var(--text); }
-.toc { display:flex; flex-wrap:wrap; gap:6px 16px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 18px; font-size:13px; } .toc b { width:100%; }
-.help code { overflow-wrap:anywhere; }
-@media (max-width:640px) {
-  main { padding:16px; } header { padding:12px 16px; gap:14px; } header nav a { margin-right:10px; }
-  .help section { padding:4px 14px 12px; } .report { padding:4px 14px 16px; } .case { padding:12px 14px; } .card { padding:14px; }
-  .help table.stack-sm, .help table.stack-sm tbody, .help table.stack-sm tr, .help table.stack-sm td { display:block; width:100%; } .help table.stack-sm thead { display:none; }
-  .help table.stack-sm tr { border-bottom:1px solid var(--line); padding:6px 0; } .help table.stack-sm td { border:0; padding:3px 10px; }
-  .help table.stack-sm td:first-child { font-weight:600; }
-  .shots a, .shots img { width:calc(50vw - 30px); }
-  h1 { font-size:20px; }
+:root { color-scheme:light dark;
+  --font:"Inter", "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; --mono:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --r:12px; --r-sm:8px; --side-w:232px;
+  --bg:#f5f6f8; --card:#fff; --side:#fbfbfc; --raised:#f0f1f4; --text:#14161b; --muted:#585e6c; --line:#e2e4e9; --line-strong:#cdd1d9;
+  --brand:#c81e33; --brand-solid:#c81e33; --brand-soft:#fdecee; --link:#1d4fd7; --focus:#2f6bff;
+  --pass:#157240; --fail:#c11f33; --review:#9a4a07; --partial:#8a5a00; --blocked:#5d6170; --error:#6b2bd4; --running:#1d58cf;
+  --shadow:0 1px 2px rgba(16,20,30,.05), 0 1px 3px rgba(16,20,30,.06); --shadow-lg:0 8px 24px rgba(16,20,30,.10); }
+@media (prefers-color-scheme: dark) { :root {
+  --bg:#0d0f13; --card:#15181e; --side:#111318; --raised:#1c2028; --text:#e7e9ee; --muted:#a2a8b5; --line:#262a33; --line-strong:#353a46;
+  --brand:#ff6378; --brand-solid:#c81e33; --brand-soft:#3a1a20; --link:#8db1ff; --focus:#8db1ff;
+  --pass:#4fcb8a; --fail:#ff7a88; --review:#f0a35a; --partial:#e5b450; --blocked:#a2a8b5; --error:#b99bff; --running:#7aa5ff;
+  --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 10px 30px rgba(0,0,0,.5); } }
+* { box-sizing:border-box; }
+html { -webkit-text-size-adjust:100%; }
+body { margin:0; font:14px/1.55 var(--font); font-feature-settings:"cv11","ss01"; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
+a { color:var(--link); text-underline-offset:2px; }
+:focus-visible { outline:2px solid var(--focus); outline-offset:2px; border-radius:4px; }
+.skip { position:absolute; left:-9999px; } .skip:focus { left:12px; top:8px; z-index:50; background:var(--card); padding:8px 12px; border-radius:var(--r-sm); box-shadow:var(--shadow-lg); }
+
+/* ── Shell: left sidebar, top bar under 900px ── */
+.shell { display:grid; grid-template-columns:var(--side-w) minmax(0,1fr); min-height:100vh; }
+.sidebar { position:sticky; top:0; height:100vh; overflow-y:auto; background:var(--side); border-right:1px solid var(--line); display:flex; flex-direction:column; z-index:20; }
+.side-top { display:flex; align-items:center; justify-content:space-between; padding:var(--s4) var(--s4) var(--s3); position:relative; }
+.brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:16px; letter-spacing:-.01em; color:var(--text); text-decoration:none; padding:2px; }
+.brand .logo { border-radius:8px; box-shadow:var(--shadow); }
+.nav-toggle, .nav-burger { display:none; }
+.side-nav { display:flex; flex-direction:column; gap:var(--s2); padding:0 var(--s3) var(--s4); flex:1; }
+.nav-group { display:grid; gap:2px; }
+.nav-label { margin:var(--s3) var(--s2) var(--s1); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+.side-nav a { display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:var(--r-sm); color:var(--text); text-decoration:none; font-weight:500; }
+.side-nav a .ico { color:var(--muted); flex:none; }
+.side-nav a:hover { background:var(--raised); }
+.side-nav a[aria-current] { background:var(--brand-soft); color:var(--brand); font-weight:600; box-shadow:inset 3px 0 0 var(--brand-solid); }
+.side-nav a[aria-current] .ico { color:var(--brand); }
+.side-foot { margin-top:auto; padding-top:var(--s4); border-top:1px solid var(--line); display:grid; gap:2px; }
+.side-foot .nav-label { margin-top:0; }
+.side-foot a { font-weight:500; color:var(--muted); } .ico.sm { width:14px; height:14px; }
+main { width:100%; max-width:1200px; margin:0 auto; padding:var(--s6) var(--s6) var(--s7); min-width:0; }
+@media (max-width:900px) {
+  .shell { display:block; }
+  .sidebar { height:auto; flex-direction:column; border-right:0; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--side) 92%, transparent); backdrop-filter:blur(8px); overflow:visible; }
+  .side-top { padding:var(--s2) var(--s4); min-height:56px; }
+  .nav-burger { display:grid; place-items:center; width:40px; height:40px; border-radius:var(--r-sm); border:1px solid var(--line); background:var(--card); color:var(--text); cursor:pointer; }
+  .nav-toggle { display:block; position:absolute; right:var(--s4); top:50%; transform:translateY(-50%); width:40px; height:40px; margin:0; opacity:0; cursor:pointer; z-index:1; }
+  .nav-toggle:focus-visible + .nav-burger { outline:2px solid var(--focus); outline-offset:2px; }
+  .nav-toggle:checked + .nav-burger { background:var(--raised); }
+  .side-nav { display:none; padding:0 var(--s4) var(--s4); max-height:calc(100vh - 56px); overflow-y:auto; }
+  .sidebar:has(.nav-toggle:checked) .side-nav { display:flex; }
+  .side-nav a { padding:10px 12px; }
+  main { padding:var(--s5) var(--s4) var(--s6); }
 }
+
+/* ── Type ── */
+h1 { font-size:24px; line-height:1.25; letter-spacing:-.02em; font-weight:700; margin:0 0 var(--s1); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+h2 { font-size:17px; letter-spacing:-.01em; font-weight:650; margin:var(--s6) 0 var(--s3); }
+h3 { font-size:15px; font-weight:600; margin:0 0 10px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.card > h2:first-child, .card > summary h2 { margin-top:0; }
+.sub { color:var(--muted); font-size:13px; } .hint { color:var(--muted); font-size:13px; margin:0; font-weight:400; }
+.crumbs { margin:0 0 var(--s2); color:var(--muted); font-size:13px; } .crumbs a { color:var(--muted); text-decoration:none; } .crumbs a:hover { color:var(--text); text-decoration:underline; }
+code { font-family:var(--mono); background:var(--raised); padding:1px 6px; border-radius:6px; font-size:12.5px; }
+pre { font-family:var(--mono); white-space:pre-wrap; font-size:12px; background:var(--raised); padding:var(--s3); border-radius:var(--r-sm); margin:6px 0; border:1px solid var(--line); }
+.visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; } th:has(> .visually-hidden) { position:relative; }
+[hidden] { display:none !important; }
+.nowrap { white-space:nowrap; } td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+.spacer { flex:1; }
+
+/* ── Page header ── */
+.page-head { display:flex; justify-content:space-between; align-items:flex-end; gap:var(--s4); flex-wrap:wrap; margin-bottom:var(--s5); }
+.page-head h1 + .sub, .page-head .sub { margin:0; max-width:720px; font-size:14px; }
+.page-head .toolbar { margin:0; }
+main > h1 + .sub { margin:0 0 var(--s5); font-size:14px; max-width:760px; }
+
+/* ── Cards ── */
+.card { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:var(--s5); margin:var(--s5) 0; box-shadow:var(--shadow); }
+details.card > summary { list-style:none; } details.card > summary::-webkit-details-marker { display:none; }
+details.card > summary::before { content:''; display:inline-block; width:8px; height:8px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); transform:rotate(-45deg); margin:0 10px 2px 0; transition:transform .15s; }
+details.card[open] > summary::before { transform:rotate(45deg); }
+details.card[open] > summary { margin-bottom:var(--s4); }
+
+/* ── Buttons: default = secondary; .primary .ghost .danger .link; .sm .lg ── */
+button, .button { font:inherit; font-weight:550; font-size:14px; line-height:20px; display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:7px 14px; min-height:36px;
+  border:1px solid var(--line-strong); border-radius:var(--r-sm); background:var(--card); color:var(--text); cursor:pointer; text-decoration:none; white-space:nowrap; box-shadow:var(--shadow);
+  transition:background .12s, border-color .12s, box-shadow .12s; }
+button:hover, .button:hover { background:var(--raised); border-color:var(--muted); }
+button.primary, .button.primary { background:var(--brand-solid); border-color:var(--brand-solid); color:#fff; }
+button.primary:hover, .button.primary:hover { background:color-mix(in srgb, var(--brand-solid) 86%, #000); border-color:color-mix(in srgb, var(--brand-solid) 86%, #000); }
+button.ghost, .button.ghost { background:transparent; border-color:transparent; box-shadow:none; }
+button.ghost:hover, .button.ghost:hover { background:var(--raised); }
+button.danger, .button.danger { color:var(--fail); }
+button.danger:hover, .button.danger:hover { background:color-mix(in srgb, var(--fail) 10%, var(--card)); border-color:color-mix(in srgb, var(--fail) 50%, var(--line)); }
+button.sm, .button.sm { min-height:28px; padding:3px 10px; font-size:13px; } button.lg, .button.lg { min-height:44px; padding:10px 20px; font-size:15px; }
+button.link { border:0; background:none; box-shadow:none; padding:0 0 0 10px; min-height:0; color:var(--fail); font-size:13px; font-weight:500; }
+button.link:hover { background:none; text-decoration:underline; }
+button:disabled, button:disabled:hover { opacity:.5; cursor:not-allowed; background:var(--card); }
+button.primary:disabled { background:var(--brand-solid); }
+button:focus-visible, .button:focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+
+/* ── Forms ── */
+input, select, textarea { font:inherit; font-size:14px; font-weight:400; padding:8px 12px; min-height:38px; border:1px solid var(--line-strong); border-radius:var(--r-sm); background:var(--card); color:var(--text); transition:border-color .12s, box-shadow .12s; }
+textarea { resize:vertical; line-height:1.5; }
+input[type=checkbox], input[type=radio] { min-height:0; width:16px; height:16px; padding:0; accent-color:var(--brand-solid); }
+input[type=file] { padding:6px; }
+input:hover, select:hover, textarea:hover { border-color:var(--muted); }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline:none; border-color:var(--focus); box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 30%, transparent); }
+input[type=checkbox]:focus-visible, input[type=radio]:focus-visible { outline:2px solid var(--focus); outline-offset:2px; box-shadow:none; }
+input::placeholder, textarea::placeholder { color:color-mix(in srgb, var(--muted) 80%, transparent); }
+input[aria-invalid=true], textarea[aria-invalid=true] { border-color:var(--fail); box-shadow:0 0 0 3px color-mix(in srgb, var(--fail) 22%, transparent); }
+.stack { display:grid; gap:var(--s4); max-width:640px; } .stack label { display:grid; gap:6px; font-weight:550; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--s4); } @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } }
+fieldset.choices { border:0; padding:0; margin:0; display:grid; gap:var(--s2); } fieldset.choices legend { font-weight:550; margin-bottom:6px; padding:0; }
+fieldset.choices label.choice { display:flex; gap:12px; align-items:flex-start; padding:var(--s3) var(--s4); border:1px solid var(--line); border-radius:var(--r-sm); cursor:pointer; font-weight:400; transition:border-color .12s, background .12s; }
+label.choice:hover { border-color:var(--line-strong); }
+label.choice:has(input:checked) { border-color:var(--brand); background:var(--brand-soft); } label.choice span { display:grid; gap:2px; } label.choice input { margin-top:3px; }
+.inline-label { display:flex; gap:8px; align-items:center; color:var(--muted); font-size:13px; min-width:0; } .inline-label select { max-width:min(320px, 60vw); }
+.req { color:var(--fail); font-size:11px; font-weight:500; } .opt { color:var(--muted); font-size:11px; font-weight:400; }
+label.check { display:flex; gap:8px; align-items:center; font-weight:400; }
+
+.toolbar { display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center; margin:var(--s4) 0; } form.inline { display:flex; gap:var(--s2); align-items:center; margin:0; flex-wrap:wrap; }
+.toolbar.center { justify-content:center; margin-top:var(--s4); } .toolbar.bulk { margin:4px 0 10px; }
+#run { flex-wrap:wrap; max-width:100%; }
+.selection-bar { display:flex; gap:var(--s3); align-items:center; margin:0 0 var(--s2); min-height:24px; }
+
+/* ── Tables: sticky header, zebra, hover ── */
+.table-wrap { position:relative; overflow:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:var(--r); background:var(--card); box-shadow:var(--shadow); max-height:78vh; }
+.table-wrap > table { min-width:560px; border:0; border-radius:0; box-shadow:none; }
+table { width:100%; border-collapse:separate; border-spacing:0; background:var(--card); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
+.table-wrap table { overflow:visible; }
+th, td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+th { font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); background:var(--raised); white-space:nowrap; }
+.table-wrap th { position:sticky; top:0; z-index:1; }
+tbody tr:nth-child(even) td { background:color-mix(in srgb, var(--raised) 40%, var(--card)); }
+tbody tr:hover td { background:color-mix(in srgb, var(--raised) 90%, var(--card)); }
+tr:last-child td { border-bottom:0; }
+.row-actions { white-space:nowrap; font-size:13px; } .row-actions form { display:inline; }
+.row-actions button.danger:not(.link) { min-height:28px; padding:3px 10px; font-size:13px; }
+
+/* ── Badges: soft pills ── */
+.badge { --c:var(--muted); display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; line-height:18px; white-space:nowrap;
+  color:var(--c); background:color-mix(in srgb, var(--c) 13%, transparent); border:1px solid color-mix(in srgb, var(--c) 28%, transparent); }
+.badge::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.badge:has(.spin)::before { display:none; }
+.badge.pass { --c:var(--pass); } .badge.fail { --c:var(--fail); } .badge.review { --c:var(--review); } .badge.partial { --c:var(--partial); } .badge.blocked { --c:var(--blocked); } .badge.error { --c:var(--error); } .badge.running { --c:var(--running); } .badge.muted { --c:var(--muted); }
+a:has(> .badge) { text-decoration:none; }
+.count { font-size:12.5px; font-weight:600; margin-right:6px; font-variant-numeric:tabular-nums; } .count.pass { color:var(--pass); } .count.fail { color:var(--fail); } .count.review { color:var(--review); } .count.partial { color:var(--partial); } .count.blocked { color:var(--blocked); } .count.error { color:var(--error); }
+tr.review td { color:var(--review); }
+.counts { display:flex; gap:2px 8px; flex-wrap:wrap; margin-top:2px; } .counts .count { white-space:nowrap; margin:0; }
+.counts.big { gap:var(--s2); margin:var(--s3) 0; } .counts.big .count { font-size:13px; padding:4px 12px; border-radius:999px; background:color-mix(in srgb, currentColor 11%, transparent); }
+.tag { display:inline-block; font-size:11px; font-weight:500; padding:1px 8px; border-radius:999px; background:var(--raised); color:var(--muted); border:1px solid var(--line); margin-top:2px; }
+.tag.ai { background:color-mix(in srgb, var(--link) 13%, transparent); color:var(--link); border-color:color-mix(in srgb, var(--link) 28%, transparent); }
+.ok { color:var(--pass); } .warn { color:var(--partial); }
+
+/* ── Feedback ── */
+.alert { background:color-mix(in srgb, var(--fail) 9%, var(--card)); border:1px solid color-mix(in srgb, var(--fail) 35%, var(--line)); padding:var(--s3) var(--s4); border-radius:var(--r-sm); margin:var(--s3) 0; }
+.alert.info { background:color-mix(in srgb, var(--running) 9%, var(--card)); border-color:color-mix(in srgb, var(--running) 32%, var(--line)); }
+.tip { background:color-mix(in srgb, var(--running) 7%, var(--card)); border:1px solid color-mix(in srgb, var(--running) 22%, var(--line)); border-left:3px solid var(--running); padding:var(--s3) var(--s4); border-radius:var(--r-sm); margin:var(--s3) 0; }
+.empty { color:var(--muted); padding:var(--s6) var(--s5); text-align:center; background:var(--card); border:1px dashed var(--line-strong); border-radius:var(--r); margin:var(--s4) 0; }
+.empty::before { content:''; display:block; width:44px; height:44px; margin:0 auto var(--s3); border-radius:12px; background:var(--raised) no-repeat center/22px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a90a0' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7l9-4 9 4-9 4-9-4z'/%3E%3Cpath d='M3 7v10l9 4 9-4V7'/%3E%3Cpath d='M12 11v10'/%3E%3C/svg%3E"); }
+.empty b { color:var(--text); font-size:15px; } .empty h1 { justify-content:center; }
+.meter { width:110px; height:6px; background:var(--line); border-radius:999px; overflow:hidden; display:inline-block; vertical-align:middle; margin-right:8px; } .meter span { display:block; height:100%; background:var(--pass); border-radius:999px; }
+.progress { height:8px; background:var(--line); border-radius:999px; overflow:hidden; } .progress span { display:block; height:100%; background:var(--running); border-radius:999px; transition:width .4s; }
+.live p { margin:10px 0; }
+.spin { width:10px; height:10px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; display:inline-block; animation:spin .8s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
+button.primary .spin { border-color:#fff; border-right-color:transparent; }
+details { margin:6px 0; } summary { cursor:pointer; color:var(--muted); font-size:13px; border-radius:4px; } summary:hover { color:var(--text); }
+details.settings > summary { color:var(--text); font-size:14px; }
+.danger-zone { margin-top:var(--s4); padding:var(--s4); border:1px solid color-mix(in srgb, var(--fail) 35%, var(--line)); border-radius:var(--r-sm); display:grid; gap:var(--s2); background:color-mix(in srgb, var(--fail) 4%, var(--card)); }
+.danger-zone h3 { margin:0 0 4px; color:var(--fail); } .danger-zone .hint { margin:0 0 6px; }
+
+/* ── Suites, runs, cases ── */
+.preview { font-size:13px; padding:8px 0; } .preview ol, .preview ul { margin:4px 0 8px; padding-left:18px; } .rule { color:var(--muted); font-size:11.5px; margin-left:4px; }
+.issues { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:var(--s3) var(--s4) var(--s3) var(--s6); box-shadow:var(--shadow); } .issues li { margin:6px 0; }
+.actual { color:var(--fail); } .cause { color:var(--muted); font-size:13px; margin-top:2px; }
+.case { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:var(--s4) var(--s5); margin:var(--s4) 0; scroll-margin-top:72px; box-shadow:var(--shadow); }
+.checks { table-layout:fixed; width:100%; } .checks td { overflow-wrap:anywhere; } .checks td:first-child, .checks th:first-child { width:36px; font-weight:700; } .checks tr.pass td:first-child { color:var(--pass); } .checks tr.fail td:first-child { color:var(--fail); } .checks tr.skip td:first-child { color:var(--muted); } .checks tr.skip { color:var(--muted); }
+.note { color:var(--muted); font-size:13px; margin:6px 0; border-left:3px solid var(--line-strong); padding-left:10px; }
+.steps { font-size:13px; } .steps li.failed, .steps li.unmatched { color:var(--fail); } .steps li.skipped { color:var(--muted); }
+.shots { display:flex; gap:var(--s3); flex-wrap:wrap; margin-top:var(--s3); } .shots a { display:grid; gap:4px; width:200px; text-decoration:none; color:var(--muted); font-size:12px; } .shots img { width:200px; border:1px solid var(--line); border-radius:var(--r-sm); transition:box-shadow .15s; } .shots a:hover img { box-shadow:var(--shadow-lg); }
+.prompt { position:relative; } .prompt button { position:absolute; right:8px; top:8px; font-size:12px; padding:3px 10px; min-height:0; }
+pre.jira { background:var(--raised); border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--s3) var(--s4); font-size:12.5px; max-width:100%; overflow-wrap:anywhere; }
+.ai-banner { display:flex; gap:var(--s4); align-items:center; justify-content:space-between; flex-wrap:wrap; border-color:color-mix(in srgb, var(--link) 32%, var(--line)); background:color-mix(in srgb, var(--link) 4%, var(--card)); }
+.ai-box { margin:6px 0 10px; padding:var(--s2) var(--s3); border-radius:var(--r-sm); background:color-mix(in srgb, var(--link) 8%, transparent); border:1px solid color-mix(in srgb, var(--link) 25%, var(--line)); }
+.rewrite { max-width:860px; } .rewrite .source { font-size:15px; margin:4px 0; } .rewrite textarea { font-family:var(--mono); font-size:13px; }
+.rewrite-head { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.issue-form { max-width:760px; } .issue-form details.paste { border:1px dashed var(--line-strong); border-radius:var(--r-sm); padding:var(--s3) var(--s4); background:var(--raised); }
+.home-assistant { background:linear-gradient(135deg, color-mix(in srgb, var(--brand-solid) 7%, var(--card)), var(--card) 60%); border-color:color-mix(in srgb, var(--brand) 25%, var(--line)); }
+.home-assistant h2 { display:flex; gap:10px; align-items:center; } .home-assistant h2 .ico { color:var(--brand); }
+.purposes { display:flex; gap:var(--s2); flex-wrap:wrap; margin:var(--s3) 0 0; padding:0; list-style:none; }
+.purposes li { font-size:13px; padding:4px 12px; border-radius:999px; background:var(--raised); border:1px solid var(--line); color:var(--text); }
+
+/* ── Report ── */
+.report { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:var(--s2) var(--s6) var(--s5); overflow-wrap:anywhere; box-shadow:var(--shadow); }
+.report [id] { scroll-margin-top:72px; }
+.report th { white-space:nowrap; } .report td:first-child { white-space:nowrap; } .report td:nth-child(3), .report td:nth-child(4) { white-space:nowrap; } .report td:last-child { white-space:normal; min-width:240px; } .report img { max-width:100%; height:auto; border:1px solid var(--line); border-radius:var(--r-sm); margin:6px 0; }
+.report table { display:block; overflow-x:auto; margin:8px 0 16px; } .report td code, .report li code { white-space:normal; }
+.report details { border:1px solid var(--line); border-radius:var(--r-sm); padding:6px 10px; margin:8px 0; } .report details summary { color:var(--text); }
+.report .finding { border-left:3px solid var(--fail); padding:2px 0 2px 14px; margin:14px 0; }
+.report h3 { display:block; margin-top:22px; } .report li { margin:3px 0; } .report blockquote { color:var(--muted); border-left:3px solid var(--line); margin:6px 0; padding-left:10px; }
+
+/* ── Help ── */
+.help { max-width:880px; } .help .lead { font-size:16px; line-height:1.6; } .help section { background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:var(--s1) var(--s5) var(--s4); margin:var(--s4) 0; scroll-margin-top:72px; box-shadow:var(--shadow); }
+.help h2 { display:flex; align-items:center; gap:10px; margin-top:var(--s5); } .help .num { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--brand-solid); color:#fff; font-size:13px; flex:none; }
+.help li { margin:5px 0; } .help table { margin:10px 0; } .help dt { font-weight:600; margin-top:12px; } .help dd { margin:4px 0 0 0; color:var(--text); }
+.help code { overflow-wrap:anywhere; }
+.toc { display:flex; flex-wrap:wrap; gap:6px 16px; background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:var(--s4) var(--s5); font-size:13px; box-shadow:var(--shadow); } .toc b { width:100%; }
 .glance { background:var(--card); }
-.flow { list-style:none; padding:0; display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:10px; counter-reset:f; }
-.flow li { counter-increment:f; border:1px solid var(--line); border-radius:8px; padding:12px; display:grid; gap:4px; margin:0; }
+.flow { list-style:none; padding:0; display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:var(--s3); counter-reset:f; }
+.flow li { counter-increment:f; border:1px solid var(--line); border-radius:var(--r-sm); padding:var(--s3); display:grid; gap:4px; margin:0; background:var(--raised); }
 .flow li b::before { content:counter(f) '. '; color:var(--brand); } .flow li span { color:var(--muted); font-size:13px; }
-.example { border-color:color-mix(in srgb, var(--brand) 45%, var(--line)) !important; } .example h3 { margin:22px 0 8px; font-size:15px; }
+.example { border-color:color-mix(in srgb, var(--brand) 40%, var(--line)) !important; } .example h3 { margin:22px 0 8px; font-size:15px; }
 .example form.inline { display:inline-flex; margin:4px 10px 4px 0; }
-.finding-demo { border-left:3px solid var(--fail); background:color-mix(in srgb, var(--fail) 5%, var(--card)); padding:4px 14px; border-radius:4px; margin:10px 0; }
-.finding-demo ul { padding-left:18px; } .pattern { border:1px dashed var(--line); border-radius:8px; padding:4px 14px; margin:10px 0; } .pattern p { margin:6px 0; }
+.finding-demo { border-left:3px solid var(--fail); background:color-mix(in srgb, var(--fail) 5%, var(--card)); padding:4px 14px; border-radius:var(--r-sm); margin:10px 0; }
+.finding-demo ul { padding-left:18px; } .pattern { border:1px dashed var(--line-strong); border-radius:var(--r-sm); padding:4px 14px; margin:10px 0; } .pattern p { margin:6px 0; }
 .fill { color:var(--muted); font-style:italic; }
 .example-cases td { vertical-align:top; } .example-cases code { white-space:nowrap; }
-.site-check h2 { margin-top:4px; } .site-check .toolbar { margin:10px 0 4px; } .page-head .toolbar { margin:0; }
-.tip { background:color-mix(in srgb, var(--running) 8%, var(--card)); border-left:3px solid var(--running); padding:10px 14px; border-radius:4px; margin:12px 0; }
-code { background:var(--bg); padding:1px 5px; border-radius:4px; font-size:12.5px; }
+
+@media (max-width:640px) {
+  h1 { font-size:21px; } .card { padding:var(--s4); } .case { padding:var(--s3) var(--s4); }
+  .help section { padding:4px var(--s4) var(--s3); } .report { padding:4px var(--s4) var(--s4); }
+  .help table.stack-sm, .help table.stack-sm tbody, .help table.stack-sm tr, .help table.stack-sm td { display:block; width:100%; } .help table.stack-sm thead { display:none; }
+  .help table.stack-sm tr { border-bottom:1px solid var(--line); padding:6px 0; } .help table.stack-sm td { border:0; padding:3px 10px; background:none; }
+  .help table.stack-sm td:first-child { font-weight:600; }
+  .shots a, .shots img { width:calc(50vw - 30px); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
+@media print { .sidebar, .toolbar, .crumbs, .skip { display:none !important; } .shell { display:block; } main { padding:0; max-width:none; } .report { border:0; padding:0; box-shadow:none; } body { background:#fff; } }
 `;

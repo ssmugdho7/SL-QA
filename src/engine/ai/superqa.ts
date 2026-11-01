@@ -20,7 +20,7 @@ const PAGE_MS = 20_000;
 const BUDGET_MS = 60_000;
 const MAX_IMAGES = 5;
 /** Anything that changes data. Exploration never clicks a control whose name matches. */
-const UNSAFE = /\b(save|delete|remove|submit|confirm|archive|update|create|add|pay|refund|publish|apply|send|import|upload|duplicate|sync|logout|sign out|disable|enable|cancel order)\b/i;
+export const UNSAFE = /\b(save|delete|remove|submit|confirm|archive|update|create|add|pay|refund|publish|apply|send|import|upload|duplicate|sync|logout|sign out|disable|enable|cancel order)\b/i;
 
 const keyOf = (env: string) => !!process.env[env]?.trim();
 /** The model Super QA asks OpenAI for. */
@@ -72,7 +72,7 @@ async function summarize(page: Page): Promise<string> {
 }
 
 /** A JPEG of the page, at most 1280 px wide (scaled in the page itself, as in assist.ts). */
-async function screenshot(page: Page): Promise<string | undefined> {
+export async function screenshot(page: Page): Promise<string | undefined> {
   const buf = await page.screenshot({ type: 'jpeg', quality: 50, timeout: 5_000 }).catch(() => null);
   if (!buf) return undefined;
   return page.evaluate(async (b64) => {
@@ -131,7 +131,7 @@ async function readDropdown(page: Page, label: string, tries = 3): Promise<strin
 }
 
 /** Waits until the page has content and stops changing (forms often render seconds after the network goes quiet). */
-async function settle(page: Page, maxMs: number): Promise<void> {
+export async function settle(page: Page, maxMs: number): Promise<void> {
   const until = Date.now() + maxMs;
   await page.waitForLoadState('networkidle', { timeout: Math.max(500, maxMs / 2) }).catch(() => {});
   let last = -1;
@@ -156,7 +156,7 @@ async function look(page: Page, label: string, names: string[], left: () => numb
 }
 
 /** From a list page: opens the first real record, then its Edit page, by links/buttons that only navigate. */
-async function openFirstRecord(page: Page): Promise<string | null> {
+export async function openFirstRecord(page: Page): Promise<string | null> {
   const name = await page.evaluate(() => {
     const row = [...document.querySelectorAll('main tbody tr, main article')].find((r) => (r as HTMLElement).innerText.trim()) as HTMLElement | undefined;
     if (!row) return null;
